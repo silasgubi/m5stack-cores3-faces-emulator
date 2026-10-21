@@ -75,14 +75,20 @@ extern void osd_set_rompath_for_saves(const char *p);
 
 /* This runs on core 0 */
 QueueHandle_t vidQueue;
+static volatile bool s_drawing = false;  /* Added: a frame is between the queue and the screen */
 static void displayTask(void *arg)
 {
     bitmap_t *bmp = NULL;
     nofrendo_log_printf("OSD: displayTask started\n");
     while (1) {
-        if (xQueueReceive(vidQueue, &bmp, portMAX_DELAY) == pdTRUE) {
-            if (!bmp || !bmp->line[0]) { nofrendo_log_printf("OSD: bad bmp\n"); continue; }
+        /* Changed: peek, flag, then receive, so "queue empty and not drawing" really means
+           idle (osd_pause_begin). */
+        if (xQueuePeek(vidQueue, &bmp, portMAX_DELAY) == pdTRUE) {
+            s_drawing = true;
+            xQueueReceive(vidQueue, &bmp, 0);
+            if (!bmp || !bmp->line[0]) { nofrendo_log_printf("OSD: bad bmp\n"); s_drawing = false; continue; }
             display_write_frame((const uint8_t **)bmp->line);
+            s_drawing = false;
             static uint32_t frames=0;
             if ((++frames & 0x3F) == 0) nofrendo_log_printf("OSD: frames=%lu\n", (unsigned long)frames);
         }
@@ -275,11 +281,29 @@ int osd_main(int argc, char *argv[])
 /* Added: stores the time of each tick to measure how much of the 16.7 ms frame
    the emulation uses (the rest is core 1 headroom). */
 static void (*s_nes_tick)(void) = NULL;
+/* Added: while the pause menu is open the ticks stop; otherwise nofrendo would run every
+   missed frame at full speed afterwards. */
+static volatile bool s_paused = false;
+
 static void timer_tick(void *arg)
 {
     (void)arg;
+    if (s_paused) return;
     s_tick_us = esp_timer_get_time();
     s_nes_tick();
+}
+
+/* Added: pause menu support (pause_menu.h). Begin stops the clock and waits until the
+   display task has finished the frame in flight; the menu then owns the screen. */
+void osd_pause_begin(void)
+{
+    s_paused = true;
+    while (uxQueueMessagesWaiting(vidQueue) > 0 || s_drawing) vTaskDelay(1);
+}
+
+void osd_pause_end(void)
+{
+    s_paused = false;
 }
 
 int osd_installtimer(int frequency, void *func, int funcsize, void *counter, int countersize)

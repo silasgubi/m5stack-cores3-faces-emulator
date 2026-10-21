@@ -17,6 +17,8 @@ as a screen-edge "ambilight", and settings you can change without a computer.
 - **Game Boy / Color** (gnuboy): 59.73 Hz, picture scaled 5:3 to 266x240 (full height), about 30 frames per second.
 - **Game menu** from `/roms` on a FAT32 microSD (up to 64 games) plus any games embedded in the firmware, remembers
   the last one, saves in `/nes_saves` and `/gb_saves`.
+- **Pause menu with save states** (Select + Start): save and resume any game at any point, even games with no battery
+  save. States of card games go to the card; states of embedded games to the console's own flash.
 - **Faces Bottom3 LEDs:** the ten LEDs follow the colors at the left and right edges of the picture, with five
   brightness levels; they also show the volume (right side), the brightness (left side) and pulse red when the
   battery is low.
@@ -84,7 +86,7 @@ save too).
 | Where | Control | Action |
 |---|---|---|
 | Game | D-pad, A, B, Select, Start | The console's buttons. |
-| Game | **Select + Start for 2 s** | Back to the menu (the save is written first). |
+| Game | **Select + Start for about 1 s** | Pause menu: Continue, Save state, Load state, Quit to menu (the cartridge save is written first). |
 | Menu | Up / Down, **A** or **Start** | Choose and play. |
 | Menu | **Select** | Settings. |
 | Menu | **B** | Help screen. |
@@ -102,8 +104,11 @@ live preview on the LEDs), volume (the first, red box is mute), Wi-Fi file trans
 ### Charging
 
 - With the rear switch on "I", the base's cell is the console's battery and charges from the console's USB-C. Charge
-  modes only control this path. The magnetic Faces Charging3 dock charges through the base's own charger and cannot be
-  controlled.
+  modes only control this path.
+- The base's own USB-C and the magnetic Faces Charging3 dock charge through the base's own charger (a TP4057 whose
+  status pins are not connected to anything), which the console cannot see or control. The firmware infers it from the
+  voltage and shows "Charging (base)" after about 1 to 2 minutes. The four pogo pins on the back are GND, 5 V in, and
+  the CoreS3 internal I2C bus (SDA, SCL); the Charging3 dock itself is passive (USB-C with 5.1 kOhm CC resistors).
 - The charge settings are kept by the power chip: after "Off" (or a paused "Smart") the device keeps not charging,
   even with new firmware, until you switch the mode back.
 - The battery percent is estimated from voltage; the chip's own gauge has not learned the cell.
@@ -146,5 +151,5 @@ affiliated with or endorsed by any of them.
 Emulador de NES e Game Boy para o M5Stack CoreS3 SE com a base Faces Bottom3 e o painel Faces Gamepad3. Compile com
 `pio run -e cores3-ptbr -t upload` para a tela em português. Ponha a chave SELECTION da base em "Core2/CoreS3". Os
 jogos não vêm junto: coloque arquivos `.nes`, `.gb` ou `.gbc` (sem compactar) na pasta `roms` de um cartão microSD
-FAT32, ou embuta no firmware pondo-os em `firmware/data/roms/` antes de compilar. Select + Start por 2 s volta ao
-menu.
+FAT32, ou embuta no firmware pondo-os em `firmware/data/roms/` antes de compilar. Select + Start por cerca de 1 s abre
+o menu de pausa, com salvar e carregar estado.

@@ -1,5 +1,6 @@
 /* Copied from geo-tp/Cardputer-Game-Station-Emulators (src/nes/nes_save.c), commit 74b4776,
-   and modified (comments only: one comment translated to English).
+   and modified: one comment translated to English; save states (osd_newextension with a
+   ".ss" extension) go to the path from state_store.h, and the pause menu glue at the end.
    SPDX-License-Identifier: MIT
    Copyright (c) geo-tp and contributors */
 #pragma GCC optimize ("Os")
@@ -13,6 +14,12 @@
 #include <unistd.h> 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "../state_store.h"
+
+/* nesstate.h (not included: its headers declare nofrendo_log_printf differently) */
+extern void state_setslot(int slot);
+extern int state_load(void);
+extern int state_save(void);
 
 extern void nofrendo_log_printf(const char *fmt, ...);
 extern char *osd_newextension(char *string, char *ext);
@@ -230,6 +237,13 @@ static void build_sd_save_path_from_xip(char *dst, size_t dstlen, const char *xi
 /* This gives filenames for storage of saves */
 char *osd_newextension(char *string, char *ext)
 {
+    /* Added: save states (".ss0" from nesstate.c) go where state_store.h says: the card for
+       a card game, the console's flash for an embedded one. No storage: an empty name, so
+       the open fails and state_save/state_load report an error. */
+    if (ext && strncmp(ext, ".ss", 3) == 0) {
+        if (!statePath(string, PATH_MAX)) string[0] = '\0';
+        return string;
+    }
     if (path_is_xip_mount(string)) {
         char buf[PATH_MAX];
         ensure_saves_dir();
@@ -253,4 +267,19 @@ int osd_makesnapname(char *filename, int len)
 {
     (void)filename; (void)len;
     return -1; /* not supported */
+}
+/* Added: pause menu glue (pause_menu.h, registered in main.cpp). nesstate.c builds the
+   state path itself through osd_newextension above, so the path argument is not used. */
+bool nes_pause_save(const char *path)
+{
+    (void)path;
+    state_setslot(0);
+    return state_save() == 0;
+}
+
+bool nes_pause_load(const char *path)
+{
+    (void)path;
+    state_setslot(0);
+    return state_load() == 0;
 }

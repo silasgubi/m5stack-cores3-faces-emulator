@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0 - 2026-10-21
+
+### Added
+
+- In-game pause menu: hold Select + Start for about 1 s for Continue, Save state, Load state and Quit to menu. A save
+  state freezes the whole emulated machine, so any NES or Game Boy game can be resumed, including games with no
+  battery save. One state per game: games from the card keep it on the card (`/states`), embedded games in the
+  console's own flash (LittleFS on the `spiffs` partition, formatted on first use).
+- Charging through the Faces base (its USB-C or the magnetic dock) is shown as "Charging (base)" and with the bolt on
+  the battery icons. The base charger is invisible to the CoreS3 power chip, so it is inferred from the battery
+  voltage rising; it takes about 1 to 2 minutes to show or clear and may not show near a full charge. No low-battery
+  alert while it is on.
+
+### Changed
+
+- Select + Start opens the pause menu (after about 1 s) instead of going straight back to the game list (after 2 s).
+
 ## 1.2.0 - 2026-10-21
 
 ### Added

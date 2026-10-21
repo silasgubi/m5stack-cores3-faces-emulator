@@ -8,6 +8,7 @@
 #include <Preferences.h>
 #include "faces_pad.h"
 #include "menu.h"
+#include "pause_menu.h"
 #include "power_mode.h"
 #include "rom_source.h"
 #include "sd_roms.h"
@@ -19,6 +20,10 @@ extern "C" {
 #include "cgs/vfs_xip.h"
 int nofrendo_main(int argc, char *argv[]);
 void sram_autosave_force_flush(void);  // cgs/nes_save.c
+bool nes_pause_save(const char *path);  // cgs/nes_save.c
+bool nes_pause_load(const char *path);
+void osd_pause_begin(void);  // cgs/nes_osd.c
+void osd_pause_end(void);
 }
 
 void setup() {
@@ -57,7 +62,8 @@ void setup() {
     }
 
     vfs_xip_register();
-    menuOnQuit(sram_autosave_force_flush);  // Select+Start restarts: write the SRAM first
+    menuOnQuit(sram_autosave_force_flush);  // "Quit to menu" restarts: write the SRAM first
+    pauseSetHandlers({nes_pause_save, nes_pause_load, osd_pause_begin, osd_pause_end});
     char path[80];
     snprintf(path, sizeof(path), "/xip/%s", rom.name);  // the name becomes the save name (cgs/nes_save.c)
     char *argv[1] = {path};

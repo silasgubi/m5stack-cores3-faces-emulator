@@ -19,6 +19,7 @@
 #include "../faces_pad.h"
 #include "../led_effects.h"
 #include "../menu.h"
+#include "../pause_menu.h"
 
 extern "C" {
 #include <gnuboy.h>
@@ -38,6 +39,17 @@ static int16_t *s_audioBuf = nullptr;
 static void videoCallback(void *) { gbDisplaySubmit(s_fb); }
 
 static void audioCallback(void *buffer, size_t length) { gbSoundSubmit((const int16_t *)buffer, length); }
+
+// Pause menu glue (pause_menu.h). The emulator only runs from the loop below, which is
+// waiting inside the frame hook while the menu is open, so begin() only has to take the
+// screen from the display task; the loop realigns its clock after a long frame.
+static bool pauseSave(const char *path) { return gnuboy_save_state(path) == 0; }
+static bool pauseLoad(const char *path) { return gnuboy_load_state(path) == 0; }
+static void pauseBegin() {
+    while (gbDisplayBusy()) delay(1);
+    gbDisplayLock();
+}
+static void pauseEnd() { gbDisplayUnlock(); }
 
 // Waits until instant t (esp_timer): sleeps in FreeRTOS while there is a lot left and
 // finishes with a busy wait, so the frame starts on time (the 1 ms tick is coarse).
@@ -114,7 +126,8 @@ void run_gb(const uint8_t *rom, size_t romLen, const char *romName) {
 
     gbSaveInit(romName);
     gbSaveLoad();
-    menuOnQuit(gbSaveFlush);  // Select+Start restarts: write the SRAM first
+    menuOnQuit(gbSaveFlush);  // "Quit to menu" restarts: write the SRAM first
+    pauseSetHandlers({pauseSave, pauseLoad, pauseBegin, pauseEnd});
     ledEffectsSetSource565(s_fb, GB_FB_W, GB_FB_H, GB_FB_W);
 
     uint32_t frame = 0;

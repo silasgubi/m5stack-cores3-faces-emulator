@@ -2,6 +2,7 @@
 #include <Preferences.h>
 #include <string.h>
 #include "menu.h"
+#include "pause_menu.h"
 #include "battery.h"
 #include "battery_icon.h"
 #include "power_mode.h"
@@ -13,7 +14,7 @@
 
 static constexpr int ROW_H = 18, ROWS = 11, LIST_Y = MENU_HEAD_H;
 static constexpr uint32_t REPEAT_FIRST_MS = 400, REPEAT_MS = 90;
-static constexpr int QUIT_HOLD_FRAMES = 120;  // ~2 s at 60 Hz
+static constexpr int PAUSE_HOLD_FRAMES = 60;  // ~1 s at 60 Hz
 
 static char s_names[SD_MAX_ROMS + 4][SD_NAME_MAX];
 static Console s_consoles[SD_MAX_ROMS + 4];
@@ -52,7 +53,7 @@ static void drawBatteryStatus() {
     M5.Display.setTextColor(TFT_WHITE, TFT_NAVY);
     M5.Display.setCursor(BAT_PCT_END - 6 * (int)strlen(text), HEADER_TEXT_Y);
     M5.Display.print(text);
-    drawBatteryIcon(BAT_ICON_X, BAT_ICON_Y, pct, batteryCharging(), present, TFT_NAVY);
+    drawBatteryIcon(BAT_ICON_X, BAT_ICON_Y, pct, batteryAnyCharging(), present, TFT_NAVY);
 }
 
 bool menuBatteryPoll(uint32_t periodMs) {
@@ -295,14 +296,19 @@ void menuCheckQuitCombo(uint8_t padBits) {
     static int held = 0;
     const bool combo = (padBits & FACES_SELECT) && (padBits & FACES_START);
     held = combo ? held + 1 : 0;
-    if (held < QUIT_HOLD_FRAMES) return;
+    if (held < PAUSE_HOLD_FRAMES) return;
+    held = 0;
+    pauseMenuRun();
+}
+
+void menuQuitToGameList() {
     if (s_onQuit) s_onQuit();
     settingsFlush();  // a brightness change from the last 3 s is not lost
     Preferences p;
     p.begin("nes", false);
     p.putBool("go_menu", true);
     p.end();
-    log_printf("menu: Select+Start, restarting\n");
+    log_printf("menu: quit to the game list, restarting\n");
     delay(100);
     esp_restart();
 }

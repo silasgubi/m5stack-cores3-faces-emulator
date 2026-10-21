@@ -13,9 +13,11 @@ RomSource menuChooseRom();
 // PNG, otherwise a text splash.
 void menuSplash();
 
-// Called by frame_hook during a game: Select + Start for 2 s goes back to the menu
-// (sets a flag in NVS and restarts; the emulators have no clean exit).
+// Called by frame_hook during a game: Select + Start for about 1 s opens the pause menu
+// (pause_menu.h), whose "Quit to menu" calls menuQuitToGameList.
 void menuCheckQuitCombo(uint8_t padBits);
+// Back to the game list: sets a flag in NVS and restarts (the emulators have no clean exit).
+[[noreturn]] void menuQuitToGameList();
 // Called right before that restart (e.g. to write the game's save).
 void menuOnQuit(void (*fn)());
 // Full-screen message (error or notice), shown for waitMs ms (0 = forever).

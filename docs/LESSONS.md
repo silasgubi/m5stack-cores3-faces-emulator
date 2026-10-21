@@ -139,3 +139,17 @@ Numbers are from one CoreS3 SE; the plain CoreS3 was not tested.
   "Smart", the device keeps not charging, even after flashing another firmware, until the mode is changed back (or
   USB is removed with the rear switch on "O").
 - **Not available:** this unit's power chip does not report battery current (M5Unified returns 0).
+
+### 17. The Faces base charger is invisible to the CoreS3
+
+- **Symptom:** charging through the base's USB-C or the magnetic dock, the battery screen says "On battery" and the
+  icon has no bolt; charge modes have no effect.
+- **Cause:** the base has its own TP4057 charger wired straight to the cell; its CHRG and STDBY status pins are not
+  connected (Faces Bottom3 schematic, sheet 2). The CoreS3 power chip (AXP2101) sees no VBUS and reports
+  "discharging". The four pogo pins on the back are GND, 5 V in (charger input, and through a diode the bus 5 V),
+  and the bus pins named G21/G22, which on the CoreS3 are the internal I2C bus (GPIO 12/11). The Charging3 dock is
+  passive: a USB-C receptacle, two 5.1 kOhm CC resistors and the pogo pins.
+- **Fix:** with no USB on the CoreS3, compare the average battery voltage of the last 30 s with the average of 60 to
+  120 s ago: +20 mV means charging, -10 mV means it stopped (`firmware/src/battery.cpp`). An exact reading would need
+  a current sensor in the dock on that I2C bus.
+- **Online:** not found.

@@ -127,6 +127,7 @@ RomSource romLoadFromSd(const char *path) {
     }
     rom.data = buf;
     rom.size = (size_t)size;
+    rom.onCard = true;
     log_printf("ROM: %s, %u bytes in %s\n", rom.name, (unsigned)rom.size, esp_ptr_external_ram(buf) ? "PSRAM" : "RAM");
     return rom;
 }

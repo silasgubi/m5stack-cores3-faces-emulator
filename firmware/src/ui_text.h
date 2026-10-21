@@ -38,7 +38,7 @@ constexpr const char *TXT_HELP_LINES[] = {
     "          < >  volume, ou brilho depois do o",
     "          o    troca entre volume e brilho",
     "          dedo na tela por 1 s: mudo",
-    "          Select + Start 2 s: menu (grava o save)",
+    "          Select + Start 1 s: pausa (salvar estado)",
     "",
     "MENU      Select: ajustes (bateria, Wi-Fi...)",
     "CARTAO    pasta /roms com .nes .gb .gbc (FAT32)",
@@ -63,6 +63,19 @@ constexpr char TXT_READ_FAILED[] = "Nao consegui ler";
 constexpr char TXT_GB_FAILED[] = "Game Boy falhou";
 constexpr char TXT_NES_FAILED[] = "NES falhou";
 
+// Pause menu (Select + Start in a game). Items in the order of pause_menu.cpp.
+constexpr char TXT_PAUSED[] = "PAUSA";
+constexpr const char *TXT_PAUSE_ITEMS[] = {"Continuar", "Salvar estado", "Carregar estado", "Sair para o menu"};
+constexpr char TXT_PAUSE_ON_CARD[] = "Estado salvo no cartao";
+constexpr char TXT_PAUSE_ON_CONSOLE[] = "Estado salvo no console";
+constexpr char TXT_PAUSE_NO_STORAGE[] = "Sem cartao: nao da para salvar";
+constexpr char TXT_PAUSE_NO_STATE[] = "Nenhum estado salvo ainda";
+constexpr char TXT_PAUSE_SAVING[] = "Salvando...";
+constexpr char TXT_PAUSE_SAVED[] = "Salvo";
+constexpr char TXT_PAUSE_LOADED[] = "Carregado";
+constexpr char TXT_PAUSE_FAILED[] = "Falhou";
+constexpr char TXT_PAUSE_FOOTER[] = "A: escolher   B: voltar ao jogo";
+
 // Settings (Select in the game menu). Items in the order of settings_menu.cpp.
 constexpr char TXT_SETTINGS[] = "AJUSTES";
 constexpr const char *TXT_SET_ITEMS[] = {"Bateria", "Brilho", "Ambilight", "Volume", "Transferir arquivos", "Ajuda"};
@@ -75,6 +88,7 @@ constexpr char TXT_BAT_VOLTAGE[] = "Tensao";
 constexpr char TXT_BAT_STATE[] = "Estado";
 constexpr char TXT_BAT_CURRENT[] = "Corrente";
 constexpr char TXT_BAT_CHARGING[] = "Carregando";
+constexpr char TXT_BAT_CHARGING_BASE[] = "Carregando (base)";
 constexpr char TXT_BAT_ON_BATTERY[] = "Na bateria";
 constexpr char TXT_BAT_NOT_CHARGING[] = "Sem carregar";
 constexpr char TXT_BAT_PAUSED[] = "Carga pausada";
@@ -142,7 +156,7 @@ constexpr const char *TXT_HELP_LINES[] = {
     "          < >  volume, or brightness after o",
     "          o    switch volume / brightness",
     "          finger on the screen for 1 s: mute",
-    "          Select + Start 2 s: menu (saves first)",
+    "          Select + Start 1 s: pause (save state)",
     "",
     "MENU      Select: settings (battery, Wi-Fi...)",
     "SD CARD   folder /roms with .nes .gb .gbc (FAT32)",
@@ -167,6 +181,19 @@ constexpr char TXT_READ_FAILED[] = "Could not read";
 constexpr char TXT_GB_FAILED[] = "Game Boy failed";
 constexpr char TXT_NES_FAILED[] = "NES failed";
 
+// Pause menu (Select + Start in a game). Items in the order of pause_menu.cpp.
+constexpr char TXT_PAUSED[] = "PAUSED";
+constexpr const char *TXT_PAUSE_ITEMS[] = {"Continue", "Save state", "Load state", "Quit to menu"};
+constexpr char TXT_PAUSE_ON_CARD[] = "State saved on the card";
+constexpr char TXT_PAUSE_ON_CONSOLE[] = "State saved on the console";
+constexpr char TXT_PAUSE_NO_STORAGE[] = "No card: cannot save";
+constexpr char TXT_PAUSE_NO_STATE[] = "No saved state yet";
+constexpr char TXT_PAUSE_SAVING[] = "Saving...";
+constexpr char TXT_PAUSE_SAVED[] = "Saved";
+constexpr char TXT_PAUSE_LOADED[] = "Loaded";
+constexpr char TXT_PAUSE_FAILED[] = "Failed";
+constexpr char TXT_PAUSE_FOOTER[] = "A: choose   B: back to the game";
+
 // Settings (Select in the game menu). Items in the order of settings_menu.cpp.
 constexpr char TXT_SETTINGS[] = "SETTINGS";
 constexpr const char *TXT_SET_ITEMS[] = {"Battery", "Brightness", "Ambilight", "Volume", "File transfer", "Help"};
@@ -179,6 +206,7 @@ constexpr char TXT_BAT_VOLTAGE[] = "Voltage";
 constexpr char TXT_BAT_STATE[] = "State";
 constexpr char TXT_BAT_CURRENT[] = "Current";
 constexpr char TXT_BAT_CHARGING[] = "Charging";
+constexpr char TXT_BAT_CHARGING_BASE[] = "Charging (base)";
 constexpr char TXT_BAT_ON_BATTERY[] = "On battery";
 constexpr char TXT_BAT_NOT_CHARGING[] = "Not charging";
 constexpr char TXT_BAT_PAUSED[] = "Charge paused";
@@ -235,6 +263,7 @@ constexpr size_t TXT_NO_GAMES_COUNT = UI_COUNT(TXT_NO_GAMES_LINES);
 constexpr size_t TXT_SET_ITEM_COUNT = UI_COUNT(TXT_SET_ITEMS);
 constexpr size_t TXT_CHARGE_MODE_COUNT = UI_COUNT(TXT_CHARGE_MODES);
 constexpr size_t TXT_BAT_NOTE_COUNT = UI_COUNT(TXT_BAT_NOTE_LINES);
+constexpr size_t TXT_PAUSE_ITEM_COUNT = UI_COUNT(TXT_PAUSE_ITEMS);
 constexpr size_t TXT_FT_NO_CARD_COUNT = UI_COUNT(TXT_FT_NO_CARD_LINES);
 constexpr size_t TXT_FT_WIFI_FAILED_COUNT = UI_COUNT(TXT_FT_WIFI_FAILED_LINES);
 
@@ -267,13 +296,25 @@ static_assert(TXT_HELP_COUNT <= 15, "help lines would run into the footer");
 static_assert(ui::allFit(TXT_NO_GAMES_LINES, TXT_NO_GAMES_COUNT, ui::LINE_MAX_1),
               "no-games line too long or not ASCII");
 
+// Pause box (pause_menu.cpp): 240 px wide, text from 12 px inside, so 18 chars at size 2
+// and 36 at size 1.
+static_assert(TXT_PAUSE_ITEM_COUNT == 4, "pause_menu.cpp expects 4 items");
+static_assert(ui::fits(TXT_PAUSED, 18) && ui::allFit(TXT_PAUSE_ITEMS, TXT_PAUSE_ITEM_COUNT, 18),
+              "pause title or item too long or not ASCII");
+static_assert(ui::fits(TXT_PAUSE_ON_CARD, 36) && ui::fits(TXT_PAUSE_ON_CONSOLE, 36) &&
+                  ui::fits(TXT_PAUSE_NO_STORAGE, 36) && ui::fits(TXT_PAUSE_NO_STATE, 36) &&
+                  ui::fits(TXT_PAUSE_SAVING, 36) && ui::fits(TXT_PAUSE_SAVED, 36) &&
+                  ui::fits(TXT_PAUSE_LOADED, 36) && ui::fits(TXT_PAUSE_FAILED, 36) &&
+                  ui::fits(TXT_PAUSE_FOOTER, 36),
+              "pause line too long or not ASCII");
+
 // Settings rows are size 2 from x=8; the right part of the row holds the value.
 static_assert(TXT_SET_ITEM_COUNT == 6, "settings_menu.cpp expects 6 items");
 static_assert(ui::allFit(TXT_SET_ITEMS, TXT_SET_ITEM_COUNT, 20), "settings item too long or not ASCII");
 static_assert(ui::fits(TXT_BAT_LEVEL, 12) && ui::fits(TXT_BAT_VOLTAGE, 12) && ui::fits(TXT_BAT_STATE, 12) &&
                   ui::fits(TXT_BAT_CURRENT, 12) && ui::fits(TXT_BAT_MODE, ui::LINE_MAX_1),
               "battery label too long or not ASCII");
-static_assert(ui::fits(TXT_BAT_CHARGING, ui::VALUE_MAX_2) && ui::fits(TXT_BAT_ON_BATTERY, ui::VALUE_MAX_2) &&
+static_assert(ui::fits(TXT_BAT_CHARGING, ui::VALUE_MAX_2) && ui::fits(TXT_BAT_CHARGING_BASE, ui::VALUE_MAX_2) && ui::fits(TXT_BAT_ON_BATTERY, ui::VALUE_MAX_2) &&
                   ui::fits(TXT_BAT_NOT_CHARGING, ui::VALUE_MAX_2) && ui::fits(TXT_BAT_PAUSED, ui::VALUE_MAX_2) &&
                   ui::fits(TXT_BAT_CHARGE_OFF, ui::VALUE_MAX_2) && ui::fits(TXT_BAT_ABSENT, ui::VALUE_MAX_2),
               "battery state too long or not ASCII");

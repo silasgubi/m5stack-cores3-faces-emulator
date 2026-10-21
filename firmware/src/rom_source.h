@@ -14,6 +14,7 @@ struct RomSource {
     size_t size = 0;
     char name[64] = {0};  // file name without folder (also names the save file)
     Console console = Console::None;
+    bool onCard = false;  // read from the SD card (its save state goes there too, state_store.h)
 };
 
 // Optional ROMs embedded in the firmware, to play without an SD card: every .nes/.gb/.gbc

@@ -11,5 +11,7 @@ void batteryRead();
 
 // Last reading (0 mV before the first one).
 int batteryMv();
-bool batteryCharging();  // the AXP2101 is charging the cell right now
-bool batteryUsb();       // power on the CoreS3 USB-C
+bool batteryCharging();      // the AXP2101 is charging the cell right now
+bool batteryUsb();           // power on the CoreS3 USB-C
+bool batteryBaseCharging();  // inferred: the Faces base charger is charging the cell (battery.cpp)
+bool batteryAnyCharging();   // either of the two: for the battery icons

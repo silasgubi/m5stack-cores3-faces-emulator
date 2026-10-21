@@ -145,11 +145,11 @@ extern "C" void osd_frame_hook(void) {
     if (batteryTick()) {
         const int mv = batteryMv();
         powerModeTick(mv);
-        hudSetBattery(batteryPercentFromMv(mv), batteryCharging(), batteryPresent(mv));
+        hudSetBattery(batteryPercentFromMv(mv), batteryAnyCharging(), batteryPresent(mv));
     }
     const uint8_t pad = facesPadRead();
-    // Select+Start restarts into the menu after 2 s: a volume change still waiting for
-    // its delayed save is written as soon as the combo is held.
+    // Select+Start opens the pause menu, which can restart into the game list: a volume
+    // change still waiting for its delayed save is written as soon as the combo is held.
     if ((pad & (FACES_SELECT | FACES_START)) == (FACES_SELECT | FACES_START) && s_saveAtMs) saveVolume();
     menuCheckQuitCombo(pad);
 #ifdef LED_ORDER_TEST

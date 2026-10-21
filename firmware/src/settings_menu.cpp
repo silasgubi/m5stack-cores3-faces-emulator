@@ -227,6 +227,10 @@ static const char *stateText(int mv, uint16_t &color) {
         color = TFT_GREEN;
         return TXT_BAT_CHARGING;
     }
+    if (batteryBaseCharging()) {  // inferred from the voltage (battery.cpp); charge modes do not apply
+        color = TFT_GREEN;
+        return TXT_BAT_CHARGING_BASE;
+    }
     if (batteryUsb()) {
         color = TFT_YELLOW;
         if (settingsChargeMode() == POWER_MODE_OFF) return TXT_BAT_CHARGE_OFF;
