@@ -1,0 +1,7 @@
+{
+  "name": "gnuboy",
+  "version": "1.0.0",
+  "description": "gnuboy core as packaged in geo-tp/Cardputer-Game-Station-Emulators (commit 74b4776), GPL-2.0",
+  "license": "GPL-2.0",
+  "build": { "srcDir": "src", "flags": ["-Isrc"] }
+}

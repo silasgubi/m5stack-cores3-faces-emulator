@@ -1,0 +1,42 @@
+gnuboy: Game Boy and Game Boy Color emulator core
+=================================================
+
+License: GNU General Public License, version 2 (see COPYING).
+
+gnuboy is released under the GPL with the version 2 text, and retro-go
+declares GPLv2. No file says "or later", so this copy is treated as
+GPL-2.0-only. The source files have no license headers of their own; COPYING
+and this NOTICE cover every file in this directory.
+
+Origin, each step derived from the previous one:
+
+1. gnuboy, by Laguna and Gilgamesh, with the contributors listed in CREDITS:
+   Damian M Gryski, Mattias Wadman, Magnus Damm, Jonathan Gevaryahu
+   (Lord Nightmare), Neil Stevens and Hii (author of TGB).
+
+2. The ODROID-GO port. The retro-go README states that its NES, GBC and SMS
+   emulators "were originally from the Triforce fork of the official Go-Play
+   firmware by crashoverride, Nemo1984, and many others"
+   (https://github.com/othercrashoverride/go-play).
+
+3. retro-go, by Alex Duchesne (ducalex): ODROID-GO port, optimizations,
+   compatibility improvements and GBC colorization palettes.
+   https://github.com/ducalex/retro-go, directory retro-core/components/gnuboy.
+   That directory is unchanged from commit 8ea557e (2024-07-16) to commit
+   4ced120 (2026-01-19).
+
+4. Cardputer Game Station, by geo-tp, with a save-state change by bomberman30.
+   https://github.com/geo-tp/Cardputer-Game-Station-Emulators, directory
+   src/gbc/gnuboy, commit 74b47763c3f2ccbaed6505b83ef0ef37c2deac82
+   (2026-05-25). Its changes to retro-go's files, with dates, are listed in
+   MODIFICATIONS.md.
+
+5. This project uses the source files of step 4 unchanged. It added:
+   - library.json: PlatformIO library manifest;
+   - NOTICE (this file) and MODIFICATIONS.md;
+   - CREDITS: restored from retro-go; identical to the Cardputer Game
+     Station copy.
+
+Not included from the Cardputer Game Station copy: CMakeLists.txt (ESP-IDF
+component file that requires retro-go), docs/ (third-party PDF manuals) and
+tests/ (archive of third-party test ROMs).

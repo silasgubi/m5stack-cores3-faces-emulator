@@ -1,0 +1,25 @@
+# Game ROMs and save files: never in git (no games are distributed with this project)
+*.nes
+*.gb
+*.gbc
+*.sav
+
+# Optional local files embedded at build time (game.nes, game.gb, logo.png)
+firmware/data/
+
+# Local build settings (names of your own embedded ROMs)
+firmware/platformio_local.ini
+
+# PlatformIO build output (any depth)
+.pio/
+
+# Local only, never published
+.private/
+CLAUDE.local.md
+
+# Python and OS clutter
+__pycache__/
+*.pyc
+desktop.ini
+Thumbs.db
+.DS_Store
