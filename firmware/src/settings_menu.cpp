@@ -18,7 +18,7 @@
 #include "ui_text.h"
 #include "wifi_transfer.h"
 
-enum Item : int { ITEM_BATTERY, ITEM_BRIGHTNESS, ITEM_TRANSFER, ITEM_HELP, ITEM_BACK, ITEM_COUNT };
+enum Item : int { ITEM_BATTERY, ITEM_BRIGHTNESS, ITEM_VOLUME, ITEM_MUTE, ITEM_AMBILIGHT, ITEM_TRANSFER, ITEM_HELP, ITEM_COUNT };
 static_assert(ITEM_COUNT == (int)TXT_SET_ITEM_COUNT, "one label per settings row (ui_text.h)");
 static_assert(POWER_MODE_COUNT == (int)TXT_CHARGE_MODE_COUNT, "one name per charge mode (ui_text.h)");
 
@@ -26,7 +26,7 @@ static constexpr int FOOT_Y = 240 - 9;
 static constexpr uint16_t SEL_BG = TFT_DARKGREEN;
 
 // Settings rows: size-2 label on the left, value on the right.
-static constexpr int ROW_Y0 = MENU_HEAD_H + 10, ROW_PITCH = 30, ROW_H = 26, ROW_TEXT_DY = (ROW_H - 16) / 2;
+static constexpr int ROW_Y0 = MENU_HEAD_H + 4, ROW_PITCH = 26, ROW_H = 22, ROW_TEXT_DY = (ROW_H - 16) / 2;
 static constexpr int ARROW_R_X = 320 - 8 - 12;  // ">" at text size 2
 static constexpr int SEG_W = 16, SEG_GAP = 4, SEG_H = 12;  // brightness level boxes
 static constexpr int SEG_X0 = ARROW_R_X - 6 - SETTINGS_BRIGHTNESS_LEVELS * (SEG_W + SEG_GAP) + SEG_GAP;
@@ -84,6 +84,36 @@ static void drawBrightnessValue(bool sel) {
     M5.Display.print('>');
 }
 
+// Volume: ten boxes (steps 1..10); step 0 shows none. Mute greys the boxes.
+static void drawVolumeValue(bool sel) {
+    constexpr int W = 8, GAP = 2, H = 12;
+    const int y = rowY(ITEM_VOLUME), step = settingsVolumeStep();
+    const uint16_t bg = sel ? SEL_BG : TFT_BLACK, fg = sel ? TFT_WHITE : TFT_LIGHTGREY;
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(step > 0 ? fg : TFT_DARKGREY, bg);
+    M5.Display.setCursor(ARROW_L_X, y + ROW_TEXT_DY);
+    M5.Display.print('<');
+    for (int k = 1; k < VOLUME_STEP_COUNT; ++k) {
+        const int x = SEG_X0 + (k - 1) * (W + GAP), sy = y + (ROW_H - H) / 2;
+        if (k <= step) {
+            M5.Display.fillRect(x, sy, W, H, settingsMuted() ? TFT_DARKGREY : TFT_GREEN);
+        } else {
+            M5.Display.fillRect(x, sy, W, H, bg);
+            M5.Display.drawRect(x, sy, W, H, TFT_DARKGREY);
+        }
+    }
+    M5.Display.setTextColor(step < VOLUME_STEP_COUNT - 1 ? fg : TFT_DARKGREY, bg);
+    M5.Display.setCursor(ARROW_R_X, y + ROW_TEXT_DY);
+    M5.Display.print('>');
+}
+
+// A short beep at the new volume, so the change can be heard (the game sets its own level later).
+static void previewVolume() {
+    if (settingsMuted() || settingsVolumeStep() == 0) return;
+    M5.Speaker.setVolume(VOLUME_STEPS[settingsVolumeStep()]);
+    M5.Speaker.tone(880, 80);
+}
+
 static void drawRow(int item, bool sel) {
     const int y = rowY(item);
     const uint16_t bg = sel ? SEL_BG : TFT_BLACK, fg = sel ? TFT_WHITE : TFT_LIGHTGREY;
@@ -96,6 +126,19 @@ static void drawRow(int item, bool sel) {
         drawBrightnessValue(sel);
         return;
     }
+    if (item == ITEM_VOLUME) {
+        drawVolumeValue(sel);
+        return;
+    }
+    if (item == ITEM_AMBILIGHT || item == ITEM_MUTE) {  // On/Off shown in place of the ">" arrow
+        const bool on = item == ITEM_MUTE ? settingsMuted() : settingsAmbilight();
+        const char *v = on ? TXT_ON : TXT_OFF;
+        // Mute "On" is the state to notice (red); ambilight "On" is the normal state (green).
+        M5.Display.setTextColor(item == ITEM_MUTE ? (on ? TFT_RED : TFT_DARKGREY) : (on ? TFT_GREEN : TFT_DARKGREY), bg);
+        M5.Display.setCursor(ARROW_R_X + 12 - 12 * (int)strlen(v), y + ROW_TEXT_DY);
+        M5.Display.print(v);
+        return;
+    }
     if (item == ITEM_BATTERY) {  // the current charge mode, visible without opening the screen
         const char *mode = TXT_CHARGE_MODES[settingsChargeMode()];
         M5.Display.setTextSize(1);
@@ -103,7 +146,7 @@ static void drawRow(int item, bool sel) {
         M5.Display.print(mode);
         M5.Display.setTextSize(2);
     }
-    if (item != ITEM_BACK) {  // ">": A opens or starts something
+    {  // ">": A opens or starts something
         M5.Display.setCursor(ARROW_R_X, y + ROW_TEXT_DY);
         M5.Display.print('>');
     }
@@ -279,9 +322,27 @@ void settingsMenuRun() {
             settingsSetBrightnessLevel(settingsBrightnessLevel() + ((pressed & FACES_LEFT) ? -1 : 1));
             drawBrightnessValue(true);
         }
+        if (sel == ITEM_VOLUME && (pressed & (FACES_LEFT | FACES_RIGHT))) {
+            settingsSetVolumeStep(settingsVolumeStep() + ((pressed & FACES_LEFT) ? -1 : 1));
+            if (settingsMuted()) settingsSetMuted(false);  // changing the volume unmutes, like in the game
+            drawRow(ITEM_VOLUME, true);
+            drawRow(ITEM_MUTE, false);
+            previewVolume();
+            continue;
+        }
+        if (sel == ITEM_MUTE && (pressed & (FACES_LEFT | FACES_RIGHT | FACES_A))) {
+            settingsSetMuted(!settingsMuted());
+            drawRow(ITEM_MUTE, true);
+            drawRow(ITEM_VOLUME, false);
+            continue;
+        }
+        if (sel == ITEM_AMBILIGHT && (pressed & (FACES_LEFT | FACES_RIGHT | FACES_A))) {
+            settingsSetAmbilight(!settingsAmbilight());
+            drawRow(ITEM_AMBILIGHT, true);
+            continue;
+        }
         if (pressed & FACES_B) break;
         if (pressed & FACES_A) {
-            if (sel == ITEM_BACK) break;
             if (sel == ITEM_TRANSFER) {
                 settingsFlush();  // the transfer mode ends in a restart
                 fileTransferRun();

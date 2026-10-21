@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.0 - 2026-10-21
+
+### Added
+
+- Settings: ambilight LEDs on/off (when off, the LEDs still show the volume and brightness levels and the
+  low-battery pulse), volume in 10 steps with a short preview beep, and mute.
+
+### Changed
+
+- In game, the battery icon moved to the top of the right strip, where battery icons usually are; it hides while
+  the volume bar shows.
+- The settings list has no "Back" row any more: B goes back (needed to fit seven rows).
+
 ## 1.0.0 - 2026-10-21
 
 First public release. Tested on one M5Stack CoreS3 SE with the Faces Bottom3 base and the Faces Gamepad3 panel.

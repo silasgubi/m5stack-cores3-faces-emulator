@@ -25,6 +25,23 @@ uint8_t settingsBrightnessValue(int level);
 int settingsChargeMode();
 void settingsSetChargeMode(int mode);
 
+// Sound: volume step 0..VOLUME_STEP_COUNT-1 (table below, 6 = 96 like the first version) and mute.
+// Saved at once (changed from the menu, where changes are rare); the in-game touch controls
+// (frame_hook.cpp) keep their own copy, loaded when the game starts, so a change here applies
+// to the next game. The same NVS keys ("vol_step", "muted") are used by both.
+constexpr uint8_t VOLUME_STEPS[] = {0, 8, 16, 32, 48, 64, 96, 128, 160, 200, 255};
+constexpr int VOLUME_STEP_COUNT = sizeof(VOLUME_STEPS);
+constexpr int VOLUME_DEFAULT_STEP = 6;
+int settingsVolumeStep();
+void settingsSetVolumeStep(int step);
+bool settingsMuted();
+void settingsSetMuted(bool muted);
+
+// Ambilight (screen-edge colors on the Faces LEDs): on by default. When off, the LEDs still
+// show the volume/brightness levels and the low-battery pulse. Saved at once.
+bool settingsAmbilight();
+void settingsSetAmbilight(bool on);
+
 // Once per frame (frame_hook, core 1): writes a pending brightness change when it is due.
 void settingsTick();
 // Writes a pending change now, e.g. right before a restart (Select+Start back to the menu).

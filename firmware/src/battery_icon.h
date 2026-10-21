@@ -29,5 +29,5 @@ void drawBatteryIconVertical(int x, int y, int w, int h, int percent, bool charg
 // Call sites:
 //   menu.cpp, title bar of every menu screen: drawBatteryIcon at the top right on the navy
 //     bar, with the percent (text size 1) right before it.
-//   hud.cpp, hudDraw() (display task): drawBatteryIconVertical at the top of the left strip,
+//   hud.cpp, hudDraw() (display task): drawBatteryIconVertical at the top of the right strip,
 //     cleared while the brightness bar (same strip) shows.

@@ -21,6 +21,9 @@
 static constexpr const char *NVS_NAMESPACE = "nes";
 static constexpr const char *KEY_BRIGHTNESS = "bright";
 static constexpr const char *KEY_CHARGE_MODE = "chg_mode";
+static constexpr const char *KEY_AMBILIGHT = "ambi";
+static constexpr const char *KEY_VOLUME = "vol_step";  // shared with frame_hook.cpp
+static constexpr const char *KEY_MUTED = "muted";
 static constexpr uint32_t SAVE_DELAY_MS = 3000;
 
 static constexpr uint8_t BRIGHTNESS_VALUES[SETTINGS_BRIGHTNESS_LEVELS] = {40, 64, 96, 160, 255};
@@ -29,6 +32,9 @@ static_assert(BRIGHTNESS_VALUES[SETTINGS_BRIGHTNESS_DEFAULT] == 96, "default lev
 static bool s_loaded = false;
 static int s_brightness = SETTINGS_BRIGHTNESS_DEFAULT;
 static int s_chargeMode = POWER_MODE_NORMAL;
+static bool s_ambilight = true;
+static int s_volumeStep = VOLUME_DEFAULT_STEP;
+static bool s_muted = false;
 static bool s_savePending = false;
 static uint32_t s_saveAtMs = 0;
 
@@ -49,6 +55,9 @@ void settingsInit() {
     p.begin(NVS_NAMESPACE, true);  // read-only: fails harmlessly (defaults) if the namespace is new
     s_brightness = clampInt(p.getUChar(KEY_BRIGHTNESS, SETTINGS_BRIGHTNESS_DEFAULT), 0, SETTINGS_BRIGHTNESS_LEVELS - 1);
     s_chargeMode = clampInt(p.getUChar(KEY_CHARGE_MODE, POWER_MODE_NORMAL), 0, POWER_MODE_COUNT - 1);
+    s_ambilight = p.getBool(KEY_AMBILIGHT, true);
+    s_volumeStep = clampInt(p.getUChar(KEY_VOLUME, VOLUME_DEFAULT_STEP), 0, VOLUME_STEP_COUNT - 1);
+    s_muted = p.getBool(KEY_MUTED, false);
     p.end();
     M5.Display.setBrightness(BRIGHTNESS_VALUES[s_brightness]);
     log_printf("settings: brightness=%d charge_mode=%d\n", s_brightness, s_chargeMode);
@@ -69,6 +78,36 @@ void settingsSetBrightnessLevel(int level) {
     s_brightness = level;
     s_savePending = true;
     s_saveAtMs = millis() + SAVE_DELAY_MS;
+}
+
+int settingsVolumeStep() { return s_volumeStep; }
+bool settingsMuted() { return s_muted; }
+
+void settingsSetVolumeStep(int step) {
+    s_volumeStep = clampInt(step, 0, VOLUME_STEP_COUNT - 1);
+    Preferences p;
+    p.begin(NVS_NAMESPACE, false);
+    p.putUChar(KEY_VOLUME, (uint8_t)s_volumeStep);
+    p.end();
+}
+
+void settingsSetMuted(bool muted) {
+    s_muted = muted;
+    Preferences p;
+    p.begin(NVS_NAMESPACE, false);
+    p.putBool(KEY_MUTED, muted);
+    p.end();
+}
+
+bool settingsAmbilight() { return s_ambilight; }
+
+void settingsSetAmbilight(bool on) {
+    if (on == s_ambilight) return;
+    s_ambilight = on;  // read by led_effects on core 1 every frame
+    Preferences p;
+    p.begin(NVS_NAMESPACE, false);
+    p.putBool(KEY_AMBILIGHT, on);
+    p.end();
 }
 
 int settingsChargeMode() { return s_chargeMode; }

@@ -32,9 +32,7 @@ static constexpr int ZONE_RIGHT_MIN_X = 200;  // ">": active control up; the "o"
 static constexpr uint32_t ACTIVE_TIMEOUT_MS = BRIGHTNESS_ACTIVE_MS;  // hud.h
 static constexpr uint32_t LONG_TOUCH_MS = 1000;
 
-static constexpr uint8_t VOLUME_STEPS[] = {0, 8, 16, 32, 48, 64, 96, 128, 160, 200, 255};
-static constexpr int VOLUME_STEP_COUNT = sizeof(VOLUME_STEPS);
-static constexpr int VOLUME_DEFAULT_STEP = 6;     // 96
+// Volume table and default step: settings.h (shared with the settings menu).
 static constexpr uint32_t VOLUME_SAVE_DELAY_MS = 3000;  // write to NVS only after the user stops changing it
 
 enum class Control : uint8_t { Volume, Brightness };

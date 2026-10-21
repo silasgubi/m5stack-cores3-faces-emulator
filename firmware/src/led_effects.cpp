@@ -33,6 +33,7 @@
 #include <string.h>
 #include "led_effects.h"
 #include "leds.h"
+#include "settings.h"
 #include "hud.h"  // BRIGHTNESS_ACTIVE_MS
 
 extern "C" {
@@ -397,9 +398,13 @@ void ledEffectsFrame() {
     const uint32_t now = millis();
     if (s_volumeUntilMs && (int32_t)(now - s_volumeUntilMs) >= 0) s_volumeUntilMs = 0;
     if (s_brightUntilMs && (int32_t)(now - s_brightUntilMs) >= 0) s_brightUntilMs = 0;
+    // Ambilight off: black strip each frame (ledsSet ignores unchanged colors, so this is
+    // cheap); the overlays and the battery pulse below still draw on top.
+    const bool ambilight = settingsAmbilight();
+    if (!ambilight) ledsClear();
     // ~30 Hz is enough for the eye and spares half the frames this cost.
     static uint8_t s_skip = 0;
-    if (!(++s_skip & 1)) {
+    if (ambilight && !(++s_skip & 1)) {
         if (s_src565) {
             const Src565 src = {s_src565, s_srcPitch};
             edgeEffect(src);

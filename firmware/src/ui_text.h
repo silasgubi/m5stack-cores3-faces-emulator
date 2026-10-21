@@ -65,7 +65,9 @@ constexpr char TXT_NES_FAILED[] = "NES falhou";
 
 // Settings (Select in the game menu). Items in the order of settings_menu.cpp.
 constexpr char TXT_SETTINGS[] = "AJUSTES";
-constexpr const char *TXT_SET_ITEMS[] = {"Bateria", "Brilho", "Transferir arquivos", "Ajuda", "Voltar"};
+constexpr const char *TXT_SET_ITEMS[] = {"Bateria", "Brilho", "Volume", "Mudo", "LEDs ambilight", "Transferir arquivos", "Ajuda"};
+constexpr char TXT_ON[] = "Ligado";
+constexpr char TXT_OFF[] = "Desligado";
 constexpr char TXT_SET_FOOTER[] = "A: abrir    < >: mudar    B: voltar";
 
 // Battery screen. Charge modes in the order of power_mode.h.
@@ -169,7 +171,9 @@ constexpr char TXT_NES_FAILED[] = "NES failed";
 
 // Settings (Select in the game menu). Items in the order of settings_menu.cpp.
 constexpr char TXT_SETTINGS[] = "SETTINGS";
-constexpr const char *TXT_SET_ITEMS[] = {"Battery", "Brightness", "File transfer", "Help", "Back"};
+constexpr const char *TXT_SET_ITEMS[] = {"Battery", "Brightness", "Volume", "Mute", "Ambilight LEDs", "File transfer", "Help"};
+constexpr char TXT_ON[] = "On";
+constexpr char TXT_OFF[] = "Off";
 constexpr char TXT_SET_FOOTER[] = "A: open    < >: change    B: back";
 
 // Battery screen. Charge modes in the order of power_mode.h.
@@ -268,7 +272,7 @@ static_assert(ui::allFit(TXT_NO_GAMES_LINES, TXT_NO_GAMES_COUNT, ui::LINE_MAX_1)
               "no-games line too long or not ASCII");
 
 // Settings rows are size 2 from x=8; the right part of the row holds the value.
-static_assert(TXT_SET_ITEM_COUNT == 5, "settings_menu.cpp expects 5 items");
+static_assert(TXT_SET_ITEM_COUNT == 7, "settings_menu.cpp expects 7 items");
 static_assert(ui::allFit(TXT_SET_ITEMS, TXT_SET_ITEM_COUNT, 20), "settings item too long or not ASCII");
 static_assert(ui::fits(TXT_BAT_LEVEL, 12) && ui::fits(TXT_BAT_VOLTAGE, 12) && ui::fits(TXT_BAT_STATE, 12) &&
                   ui::fits(TXT_BAT_CURRENT, 12) && ui::fits(TXT_BAT_MODE, ui::LINE_MAX_1),
