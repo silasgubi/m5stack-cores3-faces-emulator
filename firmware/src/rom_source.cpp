@@ -6,29 +6,20 @@
 #include <strings.h>
 #include "rom_source.h"
 
-// Names shown in the menu for the embedded ROMs; they also name the save files, so keep
-// the extension. Set them with build flags (see platformio.ini).
-#ifndef EMBED_NES_NAME
-#define EMBED_NES_NAME "Demo.nes"
-#endif
-#ifndef EMBED_GB_NAME
-#define EMBED_GB_NAME "Demo.gb"
-#endif
+// Embedded ROMs: data/roms.bin, packed at build time by scripts/embed_data.py:
+// "ROMP", u32 count, count x {char name[64], u32 offset, u32 size}, then the ROMs.
+extern const uint8_t roms_bin_start[] asm("_binary_data_roms_bin_start");
+extern const uint8_t roms_bin_end[] asm("_binary_data_roms_bin_end");
 
-extern const uint8_t game_nes_start[] asm("_binary_data_game_nes_start");
-extern const uint8_t game_nes_end[] asm("_binary_data_game_nes_end");
-extern const uint8_t game_gb_start[] asm("_binary_data_game_gb_start");
-extern const uint8_t game_gb_end[] asm("_binary_data_game_gb_end");
-
-struct Embedded { const uint8_t *start, *end; const char *name, *file; Console console; };
-static const Embedded EMBEDDED[] = {
-    {game_nes_start, game_nes_end, EMBED_NES_NAME, "data/game.nes", Console::NES},
-    {game_gb_start, game_gb_end, EMBED_GB_NAME, "data/game.gb", Console::GB},
+struct PackEntry {
+    char name[64];
+    uint32_t offset, size;
 };
-static constexpr int EMBEDDED_SLOTS = sizeof(EMBEDDED) / sizeof(EMBEDDED[0]);
+static_assert(sizeof(PackEntry) == 72, "must match scripts/embed_data.py");
 
-static int s_valid[EMBEDDED_SLOTS];  // valid index -> slot
-static int s_validCount = -1;        // -1 = not scanned yet
+static constexpr int MAX_EMBEDDED = 64;
+static int s_valid[MAX_EMBEDDED];  // valid index -> pack entry
+static int s_validCount = -1;      // -1 = not scanned yet
 static RomSource s_active;
 
 Console consoleFromName(const char *name) {
@@ -54,16 +45,29 @@ static void setName(RomSource &rom, const char *path) {
     rom.console = consoleFromName(rom.name);
 }
 
+static const PackEntry *packEntries(uint32_t &count) {
+    const size_t packSize = (size_t)(roms_bin_end - roms_bin_start);
+    count = 0;
+    if (packSize < 8 || memcmp(roms_bin_start, "ROMP", 4) != 0) return nullptr;
+    memcpy(&count, roms_bin_start + 4, 4);
+    if (8 + (size_t)count * sizeof(PackEntry) > packSize) count = 0;
+    return (const PackEntry *)(roms_bin_start + 8);  // 4-byte aligned like the pack
+}
+
 int romEmbeddedCount() {
     if (s_validCount >= 0) return s_validCount;
     s_validCount = 0;
-    for (int i = 0; i < EMBEDDED_SLOTS; ++i) {
-        const Embedded &e = EMBEDDED[i];
-        const size_t size = (size_t)(e.end - e.start);
-        if (looksLikeRom(e.console, e.start, size))
-            s_valid[s_validCount++] = i;
+    uint32_t count;
+    const PackEntry *e = packEntries(count);
+    const size_t packSize = (size_t)(roms_bin_end - roms_bin_start);
+    for (uint32_t i = 0; i < count && s_validCount < MAX_EMBEDDED; ++i) {
+        char name[sizeof(e[i].name) + 1] = {0};
+        memcpy(name, e[i].name, sizeof(e[i].name));
+        const bool inPack = e[i].offset <= packSize && e[i].size <= packSize - e[i].offset;
+        if (inPack && looksLikeRom(consoleFromName(name), roms_bin_start + e[i].offset, e[i].size))
+            s_valid[s_validCount++] = (int)i;
         else
-            log_printf("ROM: %s missing or invalid (%u bytes), not listed\n", e.file, (unsigned)size);
+            log_printf("ROM: embedded %s invalid (%u bytes), not listed\n", name, (unsigned)e[i].size);
     }
     return s_validCount;
 }
@@ -71,11 +75,13 @@ int romEmbeddedCount() {
 RomSource romEmbedded(int index) {
     RomSource rom;
     if (index < 0 || index >= romEmbeddedCount()) return rom;
-    const Embedded &e = EMBEDDED[s_valid[index]];
-    rom.data = e.start;
-    rom.size = (size_t)(e.end - e.start);
-    setName(rom, e.name);
-    rom.console = e.console;  // the slot decides, whatever extension the name has
+    uint32_t count;
+    const PackEntry &e = packEntries(count)[s_valid[index]];
+    char name[sizeof(e.name) + 1] = {0};
+    memcpy(name, e.name, sizeof(e.name));
+    rom.data = roms_bin_start + e.offset;
+    rom.size = e.size;
+    setName(rom, name);
     return rom;
 }
 

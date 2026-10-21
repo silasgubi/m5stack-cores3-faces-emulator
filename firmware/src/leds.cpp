@@ -12,7 +12,7 @@
 #include "leds.h"
 
 static constexpr int LED_PIN = 5;
-static constexpr uint8_t BRIGHTNESS = 64;  // 0..255; the datasheet gives 370 mA with all white at full
+static uint8_t s_brightness = 64;  // 0..255 (ledsSetBrightness); the datasheet gives 370 mA with all white at full
 static constexpr int BITS = LED_COUNT * 24;
 
 static rmt_obj_t *s_rmt = nullptr;
@@ -21,6 +21,7 @@ static uint8_t s_grb[LED_COUNT * 3];
 static bool s_dirty = false;
 
 bool ledsInit() {
+    if (s_rmt) return true;  // already set up (the settings menu preview starts it early)
     // 4 memory blocks (192 items): the 240-bit frame needs 1 refill by interrupt.
     s_rmt = rmtInit(LED_PIN, RMT_TX_MODE, RMT_MEM_256);
     if (!s_rmt) {
@@ -39,13 +40,15 @@ bool ledsInit() {
 void ledsSet(int index, uint8_t r, uint8_t g, uint8_t b) {
     if (index < 0 || index >= LED_COUNT) return;
     uint8_t *p = &s_grb[index * 3];
-    const uint8_t gs = g * BRIGHTNESS / 255, rs = r * BRIGHTNESS / 255, bs = b * BRIGHTNESS / 255;
+    const uint8_t gs = g * s_brightness / 255, rs = r * s_brightness / 255, bs = b * s_brightness / 255;
     if (p[0] == gs && p[1] == rs && p[2] == bs) return;
     p[0] = gs;
     p[1] = rs;
     p[2] = bs;
     s_dirty = true;
 }
+
+void ledsSetBrightness(uint8_t value) { s_brightness = value; }
 
 void ledsClear() {
     for (int i = 0; i < LED_COUNT; ++i) ledsSet(i, 0, 0, 0);

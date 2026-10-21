@@ -168,7 +168,7 @@ extern const uint8_t logo_png_start[] asm("_binary_data_logo_png_start");
 extern const uint8_t logo_png_end[] asm("_binary_data_logo_png_end");
 
 // Optional boot image. Without data/logo.png the build embeds a 1-byte placeholder
-// (scripts/rom_placeholders.py), so only a real PNG is drawn.
+// (scripts/embed_data.py), so only a real PNG is drawn.
 static bool drawLogo() {
     static const uint8_t PNG_SIG[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
     const uint8_t *png = logo_png_start;

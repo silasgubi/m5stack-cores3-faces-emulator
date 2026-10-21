@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// ROM in use: either one embedded in the firmware (data/game.nes, data/game.gb) or one
+// ROM in use: either one embedded in the firmware (data/roms/, packed in data/roms.bin) or one
 // read from the SD card into PSRAM. The emulators read it through the pointer: Nofrendo
 // via /xip (cgs/vfs_xip.c, which calls get_rom_ptr/get_rom_size), gnuboy directly
 // through gnuboy_load_rom(ptr, len).
@@ -16,10 +16,9 @@ struct RomSource {
     Console console = Console::None;
 };
 
-// Optional ROMs embedded in the firmware, to play without an SD card. A missing file is
-// built as a 1-byte placeholder (scripts/rom_placeholders.py); only valid ROMs are counted
-// and index 0..count-1 walks the valid ones. Names come from -DEMBED_NES_NAME and
-// -DEMBED_GB_NAME (default "Demo.nes" / "Demo.gb").
+// Optional ROMs embedded in the firmware, to play without an SD card: every .nes/.gb/.gbc
+// in data/roms/ at build time (scripts/embed_data.py), in name order. Only valid ROMs are
+// counted and index 0..count-1 walks them. The file name is the menu and save name.
 int romEmbeddedCount();
 RomSource romEmbedded(int index);
 // Reads the file from the SD card into PSRAM. Returns data == nullptr on failure or when

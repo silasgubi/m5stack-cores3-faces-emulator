@@ -9,5 +9,7 @@ constexpr int LED_COUNT = 10;
 bool ledsInit();
 void ledsSet(int index, uint8_t r, uint8_t g, uint8_t b);
 void ledsClear();
+// Scale applied by ledsSet from its next call on (colors already set keep the old one).
+void ledsSetBrightness(uint8_t value);
 // Sends only if some color changed. Does not block: the RMT transmits on its own (~0.3 ms).
 void ledsShow();

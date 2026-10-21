@@ -57,6 +57,16 @@ Numbers are from one CoreS3 SE; the plain CoreS3 was not tested.
   the speaker is the master clock (`firmware/src/gb/gb_sound.cpp`).
 - **Online:** partially (similar to dynamic rate control in other emulator front ends).
 
+### 16. One beep before the game can leave the game silent
+
+- **Symptom:** no sound in games after changing the volume in the settings menu, whose preview beep worked.
+- **Cause:** `M5.Speaker.tone()` starts the speaker with the default config, whose task is not pinned to a core
+  (`task_pinned_core = ~0`). It can land on core 1, which the emulator keeps busy without yielding, so the speaker
+  task never runs. The game's own config (task on core 0) was only applied `if (!M5.Speaker.isRunning())`.
+- **Fix:** the NES and Game Boy sound init always call `M5.Speaker.begin()` after setting the config, which restarts
+  the speaker with it (`firmware/src/nes_sound.cpp`, `firmware/src/gb/gb_sound.cpp`).
+- **Online:** not found.
+
 ## Faces Bottom3 base
 
 ### 7. The LED data pin is GPIO5, and only with the SELECTION switch on "Core2/CoreS3"
@@ -117,8 +127,9 @@ Numbers are from one CoreS3 SE; the plain CoreS3 was not tested.
 ### 14. The ROM list must not depend on a card or an embedded game
 
 - **Symptom:** an empty list divided by zero in the menu.
-- **Fix:** optional embedded files (1-byte placeholders created by a pre-build script, because the linker's
-  object copy step rejects empty files) and a "No games found" screen that still reaches the settings menu.
+- **Fix:** embedded games come from a pack the pre-build script always creates (just a header when
+  `firmware/data/roms/` is empty), the optional logo gets a 1-byte placeholder (the linker's object copy step
+  rejects empty files), and a "No games found" screen still reaches the settings menu.
 
 ## Power
 

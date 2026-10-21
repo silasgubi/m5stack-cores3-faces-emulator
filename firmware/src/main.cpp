@@ -28,18 +28,19 @@ void setup() {
     powerModeApply(settingsChargeMode());  // M5.begin sets a 4.2 V charge target: restore the saved mode
     log_printf("PSRAM: %u bytes\n", (unsigned)ESP.getPsramSize());
 
-    menuSplash();
-    const uint32_t splashUntil = millis() + 3000;  // boot screen stays 3 s
-    facesPadInit();
-    sdMount();  // mounting runs while the boot screen is up
-    while ((int32_t)(millis() - splashUntil) < 0) delay(10);
-
+    // go_menu is set by Select+Start in a game right before the restart (menu.cpp).
     Preferences p;
     p.begin("nes", false);
     const bool fromGame = p.getBool("go_menu", false);
     if (fromGame) p.putBool("go_menu", false);
     p.end();
-    (void)fromGame;  // the menu always shows for now; the flag is kept for a future auto-resume
+
+    menuSplash();
+    // Boot screen: 3 s at power-on, 1 s when coming back from a game to pick another one.
+    const uint32_t splashUntil = millis() + (fromGame ? 1000 : 3000);
+    facesPadInit();
+    sdMount();  // mounting runs while the boot screen is up
+    while ((int32_t)(millis() - splashUntil) < 0) delay(10);
 
     const RomSource rom = menuChooseRom();
     romSetActive(rom);

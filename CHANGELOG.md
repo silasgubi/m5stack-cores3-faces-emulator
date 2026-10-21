@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.0 - 2026-10-21
+
+### Added
+
+- Any number of embedded games: every `.nes`, `.gb` and `.gbc` file in `firmware/data/roms/` is packed into the
+  firmware at build time (`firmware/scripts/embed_data.py`); the file name is the name in the menu. About 4.5 MB of
+  flash is free for them.
+- Ambilight brightness: the Ambilight setting has levels 0 (off) to 5 (level 3 is the old fixed brightness), and the
+  LEDs show a rainbow preview while that row is selected.
+- A sixth, dimmest screen brightness level (2.5 V backlight), for dark rooms.
+
+### Changed
+
+- Game Boy picture scaled 5:3 to 266x240: full screen height, aspect ratio kept (was 3:2, 240x216).
+- Settings order: Battery, Brightness, Ambilight, Volume, File transfer, Help. Mute is no longer a separate row: it is
+  the first (red) box of the Volume bar. In game, the finger-on-screen mute still returns to the previous volume.
+- The boot screen stays 3 s at power-on and 1 s when coming back from a game.
+- The microSD game list, saves and Wi-Fi file transfer are now tested with a card (no longer "experimental").
+
+### Fixed
+
+- No sound in games after changing the volume in the settings menu (see lesson 16 in `docs/LESSONS.md`).
+
+### Removed
+
+- `firmware/platformio_local.ini` and the `EMBED_NES_NAME` / `EMBED_GB_NAME` flags, replaced by `firmware/data/roms/`.
+
 ## 1.1.0 - 2026-10-21
 
 ### Added

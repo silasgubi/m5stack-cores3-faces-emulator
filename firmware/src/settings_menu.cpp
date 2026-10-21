@@ -1,9 +1,11 @@
 // Settings screen (Select in the game menu). Runs in the menu loop on core 1, before any
 // emulator, so it draws and reads the battery (I2C) directly.
 //
-// Rows: Battery (A opens the battery screen), Brightness (left/right, applied live),
-// File transfer (A starts it), Help and Back. Up/down moves, B goes back. Only the rows
-// and values that change are redrawn.
+// Rows: Battery (A opens the battery screen), Brightness, Ambilight and Volume (left/right,
+// level bars), File transfer (A starts it) and Help. Up/down moves, B goes back. Only the
+// rows and values that change are redrawn.
+// Bars: the first Ambilight box is off and the first Volume box is mute (red when chosen);
+// the first Brightness box is the dimmest step, since the panel needs its backlight.
 // Battery screen: level, voltage and state, refreshed every 2 s, and the charge mode
 // (left/right), applied to the AXP2101 and saved at once.
 
@@ -12,23 +14,29 @@
 #include "settings_menu.h"
 #include "battery.h"
 #include "faces_pad.h"
+#include "leds.h"
 #include "menu.h"
 #include "power_mode.h"
 #include "settings.h"
 #include "ui_text.h"
 #include "wifi_transfer.h"
 
-enum Item : int { ITEM_BATTERY, ITEM_BRIGHTNESS, ITEM_VOLUME, ITEM_MUTE, ITEM_AMBILIGHT, ITEM_TRANSFER, ITEM_HELP, ITEM_COUNT };
+enum Item : int { ITEM_BATTERY, ITEM_BRIGHTNESS, ITEM_AMBILIGHT, ITEM_VOLUME, ITEM_TRANSFER, ITEM_HELP, ITEM_COUNT };
 static_assert(ITEM_COUNT == (int)TXT_SET_ITEM_COUNT, "one label per settings row (ui_text.h)");
 static_assert(POWER_MODE_COUNT == (int)TXT_CHARGE_MODE_COUNT, "one name per charge mode (ui_text.h)");
 
 static constexpr int FOOT_Y = 240 - 9;
+static bool s_ledsUsed = false;  // the ambilight preview has set up the LED strip
 static constexpr uint16_t SEL_BG = TFT_DARKGREEN;
 
 // Settings rows: size-2 label on the left, value on the right.
 static constexpr int ROW_Y0 = MENU_HEAD_H + 4, ROW_PITCH = 26, ROW_H = 22, ROW_TEXT_DY = (ROW_H - 16) / 2;
 static constexpr int ARROW_R_X = 320 - 8 - 12;  // ">" at text size 2
-static constexpr int SEG_W = 16, SEG_GAP = 4, SEG_H = 12;  // brightness level boxes
+static constexpr int SEG_W = 16, SEG_GAP = 4, SEG_H = 12;  // brightness and ambilight boxes
+static constexpr int VOL_SEG_W = 8, VOL_SEG_GAP = 2;         // volume: more steps, narrower boxes
+static_assert(AMBILIGHT_LEVELS == SETTINGS_BRIGHTNESS_LEVELS, "both bars share the box layout");
+static_assert(VOLUME_STEP_COUNT * (VOL_SEG_W + VOL_SEG_GAP) <= SETTINGS_BRIGHTNESS_LEVELS * (SEG_W + SEG_GAP),
+              "the volume bar must fit the space of the others");
 static constexpr int SEG_X0 = ARROW_R_X - 6 - SETTINGS_BRIGHTNESS_LEVELS * (SEG_W + SEG_GAP) + SEG_GAP;
 static constexpr int ARROW_L_X = SEG_X0 - 6 - 12;
 
@@ -63,53 +71,81 @@ static int rowY(int item) { return ROW_Y0 + item * ROW_PITCH; }
 
 // ---- Settings list ----
 
-static void drawBrightnessValue(bool sel) {
-    const int y = rowY(ITEM_BRIGHTNESS), level = settingsBrightnessLevel();
+// Volume as shown and set here: mute counts as step 0.
+static int volumeShown() { return settingsMuted() ? 0 : settingsVolumeStep(); }
+
+// "<", one box per level and ">". Boxes up to the value are lit; with zeroOff the first box
+// means off/mute instead: red when chosen, a red outline otherwise.
+static void drawLevelBar(int item, bool sel, int count, int value, int w, int gap, bool zeroOff) {
+    const int y = rowY(item), sy = y + (ROW_H - SEG_H) / 2;
     const uint16_t bg = sel ? SEL_BG : TFT_BLACK, fg = sel ? TFT_WHITE : TFT_LIGHTGREY;
     M5.Display.setTextSize(2);
-    M5.Display.setTextColor(level > 0 ? fg : TFT_DARKGREY, bg);
+    M5.Display.setTextColor(value > 0 ? fg : TFT_DARKGREY, bg);
     M5.Display.setCursor(ARROW_L_X, y + ROW_TEXT_DY);
     M5.Display.print('<');
-    for (int k = 0; k < SETTINGS_BRIGHTNESS_LEVELS; ++k) {
-        const int x = SEG_X0 + k * (SEG_W + SEG_GAP), sy = y + (ROW_H - SEG_H) / 2;
-        if (k <= level) {
-            M5.Display.fillRect(x, sy, SEG_W, SEG_H, TFT_GREEN);
+    for (int k = 0; k < count; ++k) {
+        const int x = SEG_X0 + k * (w + gap);
+        const bool off = zeroOff && k == 0;
+        if (off ? value == 0 : k <= value) {
+            M5.Display.fillRect(x, sy, w, SEG_H, off ? TFT_RED : TFT_GREEN);
         } else {
-            M5.Display.fillRect(x, sy, SEG_W, SEG_H, bg);
-            M5.Display.drawRect(x, sy, SEG_W, SEG_H, TFT_DARKGREY);
+            M5.Display.fillRect(x, sy, w, SEG_H, bg);
+            M5.Display.drawRect(x, sy, w, SEG_H, off ? TFT_RED : TFT_DARKGREY);
         }
     }
-    M5.Display.setTextColor(level < SETTINGS_BRIGHTNESS_LEVELS - 1 ? fg : TFT_DARKGREY, bg);
+    M5.Display.setTextColor(value < count - 1 ? fg : TFT_DARKGREY, bg);
     M5.Display.setCursor(ARROW_R_X, y + ROW_TEXT_DY);
     M5.Display.print('>');
 }
 
-// Volume: ten boxes (steps 1..10); step 0 shows none. Mute greys the boxes.
-static void drawVolumeValue(bool sel) {
-    constexpr int W = 8, GAP = 2, H = 12;
-    const int y = rowY(ITEM_VOLUME), step = settingsVolumeStep();
-    const uint16_t bg = sel ? SEL_BG : TFT_BLACK, fg = sel ? TFT_WHITE : TFT_LIGHTGREY;
-    M5.Display.setTextSize(2);
-    M5.Display.setTextColor(step > 0 ? fg : TFT_DARKGREY, bg);
-    M5.Display.setCursor(ARROW_L_X, y + ROW_TEXT_DY);
-    M5.Display.print('<');
-    for (int k = 1; k < VOLUME_STEP_COUNT; ++k) {
-        const int x = SEG_X0 + (k - 1) * (W + GAP), sy = y + (ROW_H - H) / 2;
-        if (k <= step) {
-            M5.Display.fillRect(x, sy, W, H, settingsMuted() ? TFT_DARKGREY : TFT_GREEN);
-        } else {
-            M5.Display.fillRect(x, sy, W, H, bg);
-            M5.Display.drawRect(x, sy, W, H, TFT_DARKGREY);
+static void drawLevelValue(int item, bool sel) {
+    if (item == ITEM_BRIGHTNESS)
+        drawLevelBar(item, sel, SETTINGS_BRIGHTNESS_LEVELS, settingsBrightnessLevel(), SEG_W, SEG_GAP, false);
+    else if (item == ITEM_AMBILIGHT)
+        drawLevelBar(item, sel, AMBILIGHT_LEVELS, settingsAmbilightLevel(), SEG_W, SEG_GAP, true);
+    else
+        drawLevelBar(item, sel, VOLUME_STEP_COUNT, volumeShown(), VOL_SEG_W, VOL_SEG_GAP, true);
+}
+
+// Step 0 sets mute and keeps the stored step, so the in-game unmute (finger on the screen)
+// brings back a real level.
+static void setVolumeShown(int step) {
+    step = constrain(step, 0, VOLUME_STEP_COUNT - 1);
+    if (step == 0) {
+        settingsSetMuted(true);
+        return;
+    }
+    settingsSetVolumeStep(step);
+    if (settingsMuted()) settingsSetMuted(false);
+}
+
+// Preview colors from the top (near the screen) down, the same on both sides: the rainbow
+// flag stripes, with blue and violet merged into one, since each side has 5 LEDs.
+static constexpr uint8_t PREVIEW_RGB[LED_COUNT / 2][3] = {
+    {255, 0, 0}, {255, 96, 0}, {255, 220, 0}, {0, 200, 0}, {64, 0, 255}};
+
+// While the Ambilight row is selected, the strip shows PREVIEW_RGB at the chosen level, so
+// the change can be seen (in the game the colors come from the screen). Off otherwise.
+static void previewAmbilight(bool show) {
+    if (!show && !s_ledsUsed) return;
+    s_ledsUsed = s_ledsUsed || ledsInit();
+    if (!s_ledsUsed) return;
+    if (!show || !settingsAmbilight()) {
+        ledsClear();
+    } else {
+        ledsSetBrightness(settingsLedBrightness());
+        for (int h = 0; h < LED_COUNT / 2; ++h) {  // height h: index h on the right, 9 - h on the left
+            const uint8_t *c = PREVIEW_RGB[h];
+            ledsSet(h, c[0], c[1], c[2]);
+            ledsSet(LED_COUNT - 1 - h, c[0], c[1], c[2]);
         }
     }
-    M5.Display.setTextColor(step < VOLUME_STEP_COUNT - 1 ? fg : TFT_DARKGREY, bg);
-    M5.Display.setCursor(ARROW_R_X, y + ROW_TEXT_DY);
-    M5.Display.print('>');
+    ledsShow();
 }
 
 // A short beep at the new volume, so the change can be heard (the game sets its own level later).
 static void previewVolume() {
-    if (settingsMuted() || settingsVolumeStep() == 0) return;
+    if (volumeShown() == 0) return;
     M5.Speaker.setVolume(VOLUME_STEPS[settingsVolumeStep()]);
     M5.Speaker.tone(880, 80);
 }
@@ -122,21 +158,8 @@ static void drawRow(int item, bool sel) {
     M5.Display.setTextColor(fg, bg);
     M5.Display.setCursor(8, y + ROW_TEXT_DY);
     M5.Display.print(TXT_SET_ITEMS[item]);
-    if (item == ITEM_BRIGHTNESS) {
-        drawBrightnessValue(sel);
-        return;
-    }
-    if (item == ITEM_VOLUME) {
-        drawVolumeValue(sel);
-        return;
-    }
-    if (item == ITEM_AMBILIGHT || item == ITEM_MUTE) {  // On/Off shown in place of the ">" arrow
-        const bool on = item == ITEM_MUTE ? settingsMuted() : settingsAmbilight();
-        const char *v = on ? TXT_ON : TXT_OFF;
-        // Mute "On" is the state to notice (red); ambilight "On" is the normal state (green).
-        M5.Display.setTextColor(item == ITEM_MUTE ? (on ? TFT_RED : TFT_DARKGREY) : (on ? TFT_GREEN : TFT_DARKGREY), bg);
-        M5.Display.setCursor(ARROW_R_X + 12 - 12 * (int)strlen(v), y + ROW_TEXT_DY);
-        M5.Display.print(v);
+    if (item == ITEM_BRIGHTNESS || item == ITEM_AMBILIGHT || item == ITEM_VOLUME) {
+        drawLevelValue(item, sel);
         return;
     }
     if (item == ITEM_BATTERY) {  // the current charge mode, visible without opening the screen
@@ -311,34 +334,25 @@ void settingsMenuRun() {
     drawSettings(sel);
     PadEdges pad;
     for (;;) {
+        ledsShow();  // a preview change that fell inside the 5 ms gap goes out now
         const uint8_t pressed = pad.poll();
         if (pressed & (FACES_UP | FACES_DOWN)) {
             const int old = sel;
             sel = (sel + ((pressed & FACES_UP) ? -1 : 1) + ITEM_COUNT) % ITEM_COUNT;
             drawRow(old, false);
             drawRow(sel, true);
+            previewAmbilight(sel == ITEM_AMBILIGHT);
         }
-        if (sel == ITEM_BRIGHTNESS && (pressed & (FACES_LEFT | FACES_RIGHT))) {
-            settingsSetBrightnessLevel(settingsBrightnessLevel() + ((pressed & FACES_LEFT) ? -1 : 1));
-            drawBrightnessValue(true);
-        }
-        if (sel == ITEM_VOLUME && (pressed & (FACES_LEFT | FACES_RIGHT))) {
-            settingsSetVolumeStep(settingsVolumeStep() + ((pressed & FACES_LEFT) ? -1 : 1));
-            if (settingsMuted()) settingsSetMuted(false);  // changing the volume unmutes, like in the game
-            drawRow(ITEM_VOLUME, true);
-            drawRow(ITEM_MUTE, false);
-            previewVolume();
-            continue;
-        }
-        if (sel == ITEM_MUTE && (pressed & (FACES_LEFT | FACES_RIGHT | FACES_A))) {
-            settingsSetMuted(!settingsMuted());
-            drawRow(ITEM_MUTE, true);
-            drawRow(ITEM_VOLUME, false);
-            continue;
-        }
-        if (sel == ITEM_AMBILIGHT && (pressed & (FACES_LEFT | FACES_RIGHT | FACES_A))) {
-            settingsSetAmbilight(!settingsAmbilight());
-            drawRow(ITEM_AMBILIGHT, true);
+        const int dir = (pressed & FACES_LEFT) ? -1 : (pressed & FACES_RIGHT) ? 1 : 0;
+        if (dir && (sel == ITEM_BRIGHTNESS || sel == ITEM_AMBILIGHT || sel == ITEM_VOLUME)) {
+            if (sel == ITEM_BRIGHTNESS) settingsSetBrightnessLevel(settingsBrightnessLevel() + dir);
+            if (sel == ITEM_AMBILIGHT) settingsSetAmbilightLevel(settingsAmbilightLevel() + dir);
+            if (sel == ITEM_VOLUME) {
+                setVolumeShown(volumeShown() + dir);
+                previewVolume();
+            }
+            drawLevelValue(sel, true);
+            previewAmbilight(sel == ITEM_AMBILIGHT);
             continue;
         }
         if (pressed & FACES_B) break;
@@ -361,6 +375,9 @@ void settingsMenuRun() {
         settingsTick();
         delay(16);
     }
+    previewAmbilight(false);
+    delay(6);  // ledsShow keeps 5 ms between transfers
+    ledsShow();
     settingsFlush();
     log_printf("settings: close (brightness=%d charge_mode=%d)\n", settingsBrightnessLevel(), settingsChargeMode());
 }

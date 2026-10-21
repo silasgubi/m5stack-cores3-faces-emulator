@@ -4,23 +4,28 @@ A pocket retro console built from an **M5Stack CoreS3 SE**, the **Faces Bottom3*
 panel. It plays NES and Game Boy / Game Boy Color games from a microSD card, with the base's battery, its ten RGB LEDs
 as a screen-edge "ambilight", and settings you can change without a computer.
 
-> **Status:** works on one CoreS3 SE (the plain CoreS3 is untested). Everything that needs a microSD card (game list,
-> saves, Wi-Fi file transfer) is written but **not yet tested with a card**; the embedded-game path is tested.
+![The console playing Nova the Squirrel, with the side LEDs following the picture](docs/images/hero-nes.jpg)
+
+> **Status:** works on one CoreS3 SE (the plain CoreS3 is untested), with games from a microSD card or embedded in
+> the firmware.
+
+<p align="center"><img src="docs/images/demo.gif" alt="Libbet and the Magic Floor (Game Boy) running its demo" width="360"></p>
 
 ## What it does
 
 - **NES** (Nofrendo): 60 Hz emulation, picture shown 1:1 at about 40 frames per second, sound at 22050 Hz.
-- **Game Boy / Color** (gnuboy): 59.73 Hz, picture scaled 3:2 to 240x216, about 30 frames per second.
-- **Game menu** from `/roms` on a FAT32 microSD (up to 64 games), remembers the last one, saves in `/nes_saves` and
-  `/gb_saves`.
-- **Faces Bottom3 LEDs:** the ten LEDs follow the colors at the left and right edges of the picture; they also show
-  the volume (right side), the brightness (left side) and pulse red when the battery is low.
+- **Game Boy / Color** (gnuboy): 59.73 Hz, picture scaled 5:3 to 266x240 (full height), about 30 frames per second.
+- **Game menu** from `/roms` on a FAT32 microSD (up to 64 games) plus any games embedded in the firmware, remembers
+  the last one, saves in `/nes_saves` and `/gb_saves`.
+- **Faces Bottom3 LEDs:** the ten LEDs follow the colors at the left and right edges of the picture, with five
+  brightness levels; they also show the volume (right side), the brightness (left side) and pulse red when the
+  battery is low.
 - **Battery:** the base's 600 mAh cell powers the console without a cable; percent and charge state on screen; four
   charge modes (Normal, Fast, Smart 40-80%, Off) when charging through the console's USB-C.
 - **Touch controls** on the icons printed below the screen; in game, the battery icon sits at the top of the right
   strip and the brightness bar on the left (like the original Game Boy: contrast left, volume right).
-- **Wi-Fi file transfer** (experimental): the console creates its own network, shows a QR code, and you manage games
-  and saves from a web page.
+- **Wi-Fi file transfer:** the console creates its own network, shows a QR code, and you manage games and saves from
+  a web page.
 - English or Brazilian Portuguese on-screen text (build option).
 
 ## What you need
@@ -30,12 +35,14 @@ as a screen-edge "ambilight", and settings you can change without a computer.
 | M5Stack **CoreS3 SE** | The only tested board. |
 | M5Stack **Faces Bottom3** (SKU A168) | With its battery. |
 | **Faces Gamepad3** panel | Reads over I2C. |
-| FAT32 **microSD card** | Optional for a first test; needed to play your own games. |
+| FAT32 **microSD card** | Optional: games can also be embedded in the firmware. |
 | USB-C data cable | For flashing. |
 
 **Set the SELECTION switch on the base to "Core2/CoreS3".** In the "Core" position the LED data line lands on the
 speaker's data pin and the LEDs will not work (see [docs/LESSONS.md](docs/LESSONS.md)). The slide switch on the back
 of the base connects the battery: "I" is on, "O" is off.
+
+<p align="center"><img src="docs/images/back.jpg" alt="Back of the Faces Bottom3 base with the battery switch" width="360"></p>
 
 ## Build and flash
 
@@ -49,8 +56,9 @@ pio run -e cores3-ptbr -t upload --upload-port <PORT> # Brazilian Portuguese
 
 Keep the PlatformIO build folder out of cloud-synced directories (set `PLATFORMIO_WORKSPACE_DIR`).
 
-The build works with no games at all: optional files in `firmware/data/` (`game.nes`, `game.gb`, `logo.png`) are
-embedded if present, and a pre-build script creates empty placeholders if they are missing.
+The build works with no games at all. To play without a card, put `.nes`, `.gb` or `.gbc` files in
+`firmware/data/roms/` (not tracked by git): a pre-build script packs them into the firmware, and the file name is the
+name in the menu. An optional `firmware/data/logo.png` (240x180) replaces the text boot screen.
 
 ## Games
 
@@ -60,9 +68,16 @@ embedded if present, and a pre-build script creates empty placeholders if they a
 2. Copy `.nes`, `.gb` or `.gbc` files, **not zipped**.
 3. Insert it, power on, pick a game.
 
+Or embed them in the firmware (see Build and flash): they are listed after the card's games. Free homebrew that
+runs well: [Nova the Squirrel](https://github.com/NovaSquirrel/NovaTheSquirrel) and
+[Thwaite](https://github.com/pinobatch/thwaite-nes) (NES), [Libbet and the Magic Floor](https://github.com/pinobatch/libbet)
+(Game Boy, with a demo mode on Select) and [µCity](https://github.com/AntonioND/ucity) (Game Boy Color).
+
 The NES core includes about 40 cartridge mappers (among them MMC1, MMC3 and MMC5), but not every game runs
-correctly; only a few games were tried so far. Game Boy / Color cartridges with battery RAM keep their save on the
-card.
+correctly. Game Boy / Color cartridges with battery RAM keep their save on the card (embedded games need a card to
+save too).
+
+<p align="center"><img src="docs/images/menu.jpg" alt="Game menu" width="360"> <img src="docs/images/boot.jpg" alt="Boot screen" width="360"></p>
 
 ## Controls
 
@@ -79,8 +94,10 @@ card.
 | Console | Side button: tap | Power on. |
 | Console | Side button: hold about 4 s | Power off. |
 
-Settings (Select in the menu): battery and charge mode, brightness (5 levels), volume, mute, ambilight LEDs on/off,
-Wi-Fi file transfer, help. B goes back.
+Settings (Select in the menu): battery and charge mode, brightness (6 levels), ambilight (off and 5 levels, with a
+live preview on the LEDs), volume (the first, red box is mute), Wi-Fi file transfer, help. B goes back.
+
+<p align="center"><img src="docs/images/settings.jpg" alt="Settings menu with the ambilight row selected" width="300"></p>
 
 ### Charging
 
@@ -91,11 +108,16 @@ Wi-Fi file transfer, help. B goes back.
   even with new firmware, until you switch the mode back.
 - The battery percent is estimated from voltage; the chip's own gauge has not learned the cell.
 
-### Wi-Fi file transfer (experimental)
+### Wi-Fi file transfer
+
+<p align="center"><img src="docs/images/file-transfer.jpg" alt="File transfer screen with the QR code" width="360"></p>
 
 Settings, then File transfer. The console starts a network named `M5-Emulator-XXXX` with a new 8-digit password each
 time and shows a QR code. Join it, open `http://10.10.0.1`, and list, upload and delete games, or download and restore
 saves. B on the console exits and restarts into the menu. Wi-Fi never runs together with a game.
+
+The screen can not be turned fully off for a Game Boy-like reflective look: the IPS panel shows nothing without its
+backlight, so the lowest brightness level is the dimmest step the power chip offers.
 
 ## What we learned
 
@@ -124,5 +146,5 @@ affiliated with or endorsed by any of them.
 Emulador de NES e Game Boy para o M5Stack CoreS3 SE com a base Faces Bottom3 e o painel Faces Gamepad3. Compile com
 `pio run -e cores3-ptbr -t upload` para a tela em português. Ponha a chave SELECTION da base em "Core2/CoreS3". Os
 jogos não vêm junto: coloque arquivos `.nes`, `.gb` ou `.gbc` (sem compactar) na pasta `roms` de um cartão microSD
-FAT32. Select + Start por 2 s volta ao menu. O que depende do cartão (lista de jogos, saves e transferência por
-Wi-Fi) ainda não foi testado.
+FAT32, ou embuta no firmware pondo-os em `firmware/data/roms/` antes de compilar. Select + Start por 2 s volta ao
+menu.

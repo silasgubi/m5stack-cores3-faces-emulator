@@ -398,6 +398,7 @@ void ledEffectsFrame() {
     const uint32_t now = millis();
     if (s_volumeUntilMs && (int32_t)(now - s_volumeUntilMs) >= 0) s_volumeUntilMs = 0;
     if (s_brightUntilMs && (int32_t)(now - s_brightUntilMs) >= 0) s_brightUntilMs = 0;
+    ledsSetBrightness(settingsLedBrightness());
     // Ambilight off: black strip each frame (ledsSet ignores unchanged colors, so this is
     // cheap); the overlays and the battery pulse below still draw on top.
     const bool ambilight = settingsAmbilight();

@@ -1,5 +1,6 @@
-# Local build settings (e.g. names of your own embedded ROMs), see platformio.ini.
-platformio_local.ini
+# Your own embedded games (see platformio.ini) and the pack built from them.
+data/roms/
+data/roms.bin
 
 # Optional boot image: keep it local, it may not be yours to redistribute.
 data/logo.png

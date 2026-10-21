@@ -6,8 +6,8 @@
 // Everything here is cheap and meant for core 1 (setup/menu and frame_hook). The values
 // are plain ints written only from core 1, so reading them from core 0 is safe too.
 
-constexpr int SETTINGS_BRIGHTNESS_LEVELS = 5;
-constexpr int SETTINGS_BRIGHTNESS_DEFAULT = 2;  // 96, the fixed value used before this setting
+constexpr int SETTINGS_BRIGHTNESS_LEVELS = 6;
+constexpr int SETTINGS_BRIGHTNESS_DEFAULT = 3;  // 96, the fixed value used before this setting
 
 // Loads both settings (only the first call does work) and applies the brightness.
 // Call right after M5.begin(), in place of a fixed M5.Display.setBrightness().
@@ -37,10 +37,15 @@ void settingsSetVolumeStep(int step);
 bool settingsMuted();
 void settingsSetMuted(bool muted);
 
-// Ambilight (screen-edge colors on the Faces LEDs): on by default. When off, the LEDs still
-// show the volume/brightness levels and the low-battery pulse. Saved at once.
-bool settingsAmbilight();
-void settingsSetAmbilight(bool on);
+// Ambilight (screen-edge colors on the Faces LEDs): level 0 = off, 1..AMBILIGHT_LEVELS-1 set
+// the LED brightness. When off, the LEDs still show the volume/brightness levels and the
+// low-battery pulse, at the default level brightness. Saved at once.
+constexpr int AMBILIGHT_LEVELS = 6;
+constexpr int AMBILIGHT_DEFAULT = 3;  // 64, the fixed LED brightness used before this setting
+int settingsAmbilightLevel();
+void settingsSetAmbilightLevel(int level);
+bool settingsAmbilight();       // level > 0
+uint8_t settingsLedBrightness();  // 0..255 scale for leds.cpp
 
 // Once per frame (frame_hook, core 1): writes a pending brightness change when it is due.
 void settingsTick();

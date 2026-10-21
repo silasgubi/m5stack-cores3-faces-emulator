@@ -1,12 +1,12 @@
-// User settings kept in NVS: screen brightness level and charge mode.
+// User settings kept in NVS: screen brightness, charge mode, ambilight and sound.
 //
 // Brightness: on the CoreS3 the backlight is not PWM. M5GFX turns the 0..255 value into
 // the AXP2101 DLDO1 voltage, (value + 641) >> 5 = 0.1 V steps from 2.5 V (1..30) to 3.3 V
 // (255), so only 9 distinct steps exist. The levels below land on distinct steps
-// (2.6 / 2.7 / 2.8 / 3.0 / 3.3 V) and also form a near-geometric series (x1.5..1.67),
-// so each press looks like a similar change. 2.5 V is skipped: it is close to the LED
-// forward voltage and may be too dim to read indoors. Level 2 (96) is the value the
-// firmware always used. Lower levels draw less backlight current: less heat near the
+// (2.5 / 2.6 / 2.7 / 2.8 / 3.0 / 3.3 V) and, above the first, form a near-geometric series
+// (x1.5..1.67), so each press looks like a similar change. 2.5 V, the lowest step (the
+// IPS panel shows nothing with the backlight off), is close to the LED forward voltage:
+// very dim, meant for dark rooms. Level 3 (96) is the value the firmware always used. Lower levels draw less backlight current: less heat near the
 // board and longer battery life; full brightness warms the board measurably.
 //
 // Saving: brightness changes come in bursts (one press per step), so it is written to
@@ -19,20 +19,28 @@
 #include "power_mode.h"
 
 static constexpr const char *NVS_NAMESPACE = "nes";
-static constexpr const char *KEY_BRIGHTNESS = "bright";
+static constexpr const char *KEY_BRIGHTNESS = "bri_lvl";
+static constexpr const char *KEY_BRIGHTNESS_V1 = "bright";  // 5-level scale before the 2.5 V level was added
 static constexpr const char *KEY_CHARGE_MODE = "chg_mode";
-static constexpr const char *KEY_AMBILIGHT = "ambi";
+static constexpr const char *KEY_AMBILIGHT = "ambi_lvl";
+static constexpr const char *KEY_AMBILIGHT_V1 = "ambi";  // on/off before the levels
 static constexpr const char *KEY_VOLUME = "vol_step";  // shared with frame_hook.cpp
 static constexpr const char *KEY_MUTED = "muted";
 static constexpr uint32_t SAVE_DELAY_MS = 3000;
 
-static constexpr uint8_t BRIGHTNESS_VALUES[SETTINGS_BRIGHTNESS_LEVELS] = {40, 64, 96, 160, 255};
+static constexpr uint8_t BRIGHTNESS_VALUES[SETTINGS_BRIGHTNESS_LEVELS] = {16, 40, 64, 96, 160, 255};
 static_assert(BRIGHTNESS_VALUES[SETTINGS_BRIGHTNESS_DEFAULT] == 96, "default level must keep the old brightness");
+
+// LED brightness per ambilight level (index 0 = off). Capped at 192: 10 LEDs in full white
+// draw ~370 mA at 255, a lot for the 600 mAh battery. Below 16 the colors lose too many
+// steps per channel.
+static constexpr uint8_t AMBILIGHT_VALUES[AMBILIGHT_LEVELS] = {0, 16, 32, 64, 128, 192};
+static_assert(AMBILIGHT_VALUES[AMBILIGHT_DEFAULT] == 64, "default level must keep the old LED brightness");
 
 static bool s_loaded = false;
 static int s_brightness = SETTINGS_BRIGHTNESS_DEFAULT;
 static int s_chargeMode = POWER_MODE_NORMAL;
-static bool s_ambilight = true;
+static int s_ambilight = AMBILIGHT_DEFAULT;
 static int s_volumeStep = VOLUME_DEFAULT_STEP;
 static bool s_muted = false;
 static bool s_savePending = false;
@@ -53,9 +61,16 @@ void settingsInit() {
     s_loaded = true;
     Preferences p;
     p.begin(NVS_NAMESPACE, true);  // read-only: fails harmlessly (defaults) if the namespace is new
-    s_brightness = clampInt(p.getUChar(KEY_BRIGHTNESS, SETTINGS_BRIGHTNESS_DEFAULT), 0, SETTINGS_BRIGHTNESS_LEVELS - 1);
+    // Older keys are read once, mapped to the new scales (the old brightness levels sit one up).
+    const int brightness = p.isKey(KEY_BRIGHTNESS) ? p.getUChar(KEY_BRIGHTNESS)
+                           : p.isKey(KEY_BRIGHTNESS_V1) ? p.getUChar(KEY_BRIGHTNESS_V1) + 1
+                                                        : SETTINGS_BRIGHTNESS_DEFAULT;
+    s_brightness = clampInt(brightness, 0, SETTINGS_BRIGHTNESS_LEVELS - 1);
     s_chargeMode = clampInt(p.getUChar(KEY_CHARGE_MODE, POWER_MODE_NORMAL), 0, POWER_MODE_COUNT - 1);
-    s_ambilight = p.getBool(KEY_AMBILIGHT, true);
+    const int ambilight = p.isKey(KEY_AMBILIGHT) ? p.getUChar(KEY_AMBILIGHT)
+                          : p.getBool(KEY_AMBILIGHT_V1, true) ? AMBILIGHT_DEFAULT
+                                                             : 0;
+    s_ambilight = clampInt(ambilight, 0, AMBILIGHT_LEVELS - 1);
     s_volumeStep = clampInt(p.getUChar(KEY_VOLUME, VOLUME_DEFAULT_STEP), 0, VOLUME_STEP_COUNT - 1);
     s_muted = p.getBool(KEY_MUTED, false);
     p.end();
@@ -99,14 +114,17 @@ void settingsSetMuted(bool muted) {
     p.end();
 }
 
-bool settingsAmbilight() { return s_ambilight; }
+int settingsAmbilightLevel() { return s_ambilight; }
+bool settingsAmbilight() { return s_ambilight > 0; }
+uint8_t settingsLedBrightness() { return AMBILIGHT_VALUES[s_ambilight > 0 ? s_ambilight : AMBILIGHT_DEFAULT]; }
 
-void settingsSetAmbilight(bool on) {
-    if (on == s_ambilight) return;
-    s_ambilight = on;  // read by led_effects on core 1 every frame
+void settingsSetAmbilightLevel(int level) {
+    level = clampInt(level, 0, AMBILIGHT_LEVELS - 1);
+    if (level == s_ambilight) return;
+    s_ambilight = level;  // read by led_effects on core 1 every frame
     Preferences p;
     p.begin(NVS_NAMESPACE, false);
-    p.putBool(KEY_AMBILIGHT, on);
+    p.putUChar(KEY_AMBILIGHT, (uint8_t)level);
     p.end();
 }
 

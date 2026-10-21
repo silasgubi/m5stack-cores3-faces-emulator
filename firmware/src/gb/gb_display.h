@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-// Game Boy display: 160x144 at 1.5x (240x216), centered on the 320x240 screen.
+// Game Boy display: 160x144 at 5/3 (266x240), full height, centered on the 320x240 screen.
 // A task on core 0 gets the framebuffer pointer through a queue, converts it in bands
 // and sends them by DMA (same scheme as nes_display.cpp), so the emulation (core 1)
 // does not wait for the SPI. The framebuffer comes from gnuboy as RGB565 with swapped

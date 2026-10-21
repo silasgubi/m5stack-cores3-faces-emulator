@@ -1,7 +1,8 @@
-// Game Boy display (see gb_display.h). Nearest-neighbor 3:2 scaling, with no
-// table and no float: every 2 source pixels (a, b) become 3 destination pixels (a, a, b), and
-// every 2 source lines become 3 destination lines (a, a, b). It is exactly the map
-// src = dst * 2 / 3, just unrolled.
+// Game Boy display (see gb_display.h). Nearest-neighbor 5:3 scaling to the full screen
+// height: 160x144 becomes 266x240 (the aspect ratio kept), centered with 27 px strips on
+// each side for the HUD (hud.cpp: battery and level bars fit in them). Every 3 source lines
+// become 5 destination lines; columns use a table, src = dst * 3 / 5. 266 and not 267: the
+// last column would be a 1-pixel sliver of the same source column.
 
 #include <M5Unified.h>
 #include <freertos/FreeRTOS.h>
@@ -12,29 +13,25 @@
 #include "gb_display.h"
 #include "../hud.h"
 
-static constexpr int DST_W = GB_FB_W * 3 / 2;  // 240
-static constexpr int DST_H = GB_FB_H * 3 / 2;  // 216
-static constexpr int X0 = (320 - DST_W) / 2;   // 40
-static constexpr int Y0 = (240 - DST_H) / 2;   // 12
-// 24 destination lines = 16 source lines: bands fall on multiples of the 3-line pattern.
-static constexpr int BAND_ROWS = 24;           // 216 / 24 = 9 bands of 11.5 KB
+static constexpr int DST_W = GB_FB_W * 5 / 3;  // 266
+static constexpr int DST_H = GB_FB_H * 5 / 3;  // 240
+static constexpr int X0 = (320 - DST_W) / 2;   // 27
+static constexpr int Y0 = (240 - DST_H) / 2;   // 0
+// 20 destination lines = 12 source lines: bands fall on multiples of the 5-line pattern.
+static constexpr int BAND_ROWS = 20;           // 240 / 20 = 12 bands of 10.4 KB
 static_assert(DST_H % BAND_ROWS == 0, "band must divide the height");
-static_assert(BAND_ROWS % 3 == 0, "band must follow the 3-line pattern");
+static_assert(BAND_ROWS % 5 == 0, "band must follow the 5-line pattern");
+static_assert((DST_W - 1) * 3 / 5 < GB_FB_W, "the column table must stay inside the source line");
 
 static QueueHandle_t s_queue = nullptr;
 static SemaphoreHandle_t s_spi = nullptr;
 static TaskHandle_t s_task = nullptr;
 static uint16_t *s_band[2] = {nullptr, nullptr};
 static volatile bool s_busy = false;
+static uint8_t s_srcX[DST_W];  // source column of each destination column
 
 static inline void scaleRow(const uint16_t *src, uint16_t *dst) {
-    for (int k = 0; k < GB_FB_W / 2; ++k) {
-        const uint16_t a = *src++, b = *src++;
-        dst[0] = a;
-        dst[1] = a;
-        dst[2] = b;
-        dst += 3;
-    }
+    for (int x = 0; x < DST_W; ++x) dst[x] = src[s_srcX[x]];
 }
 
 static void drawFrame(const uint16_t *fb) {
@@ -46,7 +43,7 @@ static void drawFrame(const uint16_t *fb) {
     for (int y0 = 0; y0 < DST_H; y0 += BAND_ROWS) {
         uint16_t *dst = s_band[flip];
         for (int y = y0; y < y0 + BAND_ROWS; ++y, dst += DST_W) {
-            const int sy = y * 2 / 3;
+            const int sy = y * 3 / 5;
             if (sy == prevSrc && y != y0) {
                 memcpy(dst, dst - DST_W, DST_W * sizeof(uint16_t));  // repeated line: just copy
             } else {
@@ -87,6 +84,7 @@ static void displayTask(void *) {
 }
 
 bool gbDisplayInit() {
+    for (int x = 0; x < DST_W; ++x) s_srcX[x] = (uint8_t)(x * 3 / 5);
     for (auto &b : s_band) {
         if (!b) b = (uint16_t *)heap_caps_malloc(DST_W * BAND_ROWS * 2, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
         if (!b) {

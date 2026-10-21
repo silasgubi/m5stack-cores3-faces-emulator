@@ -39,6 +39,9 @@ bool gbSoundInit() {
     if (!s_ring) return false;
     s_wr = s_rd = 0;
 
+    // A beep in the settings menu (tone) may have started the speaker with the default
+    // config, whose unpinned task can land on core 1 and starve: restart it with ours.
+    if (M5.Speaker.isRunning()) M5.Speaker.end();
     auto cfg = M5.Speaker.config();
     cfg.sample_rate = GB_SAMPLE_RATE;
     cfg.stereo = false;
@@ -47,7 +50,7 @@ bool gbSoundInit() {
     cfg.task_priority = 4;
     cfg.task_pinned_core = 0;  // the emulator has core 1 to itself
     M5.Speaker.config(cfg);
-    if (!M5.Speaker.isRunning()) M5.Speaker.begin();
+    M5.Speaker.begin();
     M5.Speaker.setVolume(kVolume);
     M5.Speaker.stop(kChannel);
     return true;

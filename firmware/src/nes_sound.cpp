@@ -39,6 +39,9 @@ extern "C" {
 int osd_init_sound() {
     for (auto &b : s_buf) b = (int16_t *)heap_caps_calloc(kMaxChunk, sizeof(int16_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 
+    // A beep in the settings menu (tone) may have started the speaker with the default
+    // config, whose unpinned task can land on core 1 and starve: restart it with ours.
+    if (M5.Speaker.isRunning()) M5.Speaker.end();
     auto cfg = M5.Speaker.config();
     cfg.sample_rate = kSampleRate;
     cfg.stereo = false;
@@ -47,7 +50,7 @@ int osd_init_sound() {
     cfg.task_priority = 4;
     cfg.task_pinned_core = 0;  // the emulator has core 1 to itself
     M5.Speaker.config(cfg);
-    if (!M5.Speaker.isRunning()) M5.Speaker.begin();
+    M5.Speaker.begin();
     M5.Speaker.setVolume(kVolume);
     M5.Speaker.stop(kChannel);
     return 0;

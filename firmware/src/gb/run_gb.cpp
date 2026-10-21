@@ -126,7 +126,7 @@ void run_gb(const uint8_t *rom, size_t romLen, const char *romName) {
     for (;;) {
         const int64_t t0 = esp_timer_get_time();
         // Draw when the display is free and the previous frame was not late. Sending
-        // 240x216 takes ~21 ms, so two consecutive frames never go out (~30 Hz); without
+        // 266x240 takes ~26 ms, so two consecutive frames never go out (~30 Hz); without
         // requiring an even frame, a busy display at frame N does not push the draw to N+4.
         const bool draw = !late && !gbDisplayBusy();
         gnuboy_run(draw);
