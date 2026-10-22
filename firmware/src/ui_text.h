@@ -31,21 +31,21 @@ constexpr char TXT_MENU_FOOTER[] = "A/Start: jogar   Select: ajustes   B: ajuda"
 
 constexpr char TXT_HELP[] = "AJUDA";
 constexpr const char *TXT_HELP_LINES[] = {
-    "LIGAR     toque curto no botao lateral (esquerda)",
-    "DESLIGAR  segurar o botao lateral ~4 s",
+    "ENERGIA   botao lateral: toque liga, ~4 s desliga",
     "",
     "NO JOGO   icones abaixo da tela:",
     "          < >  volume, ou brilho depois do o",
     "          o    troca entre volume e brilho",
     "          dedo na tela por 1 s: mudo",
-    "          Select + Start 1 s: pausa (salvar estado)",
+    "          Select+Start 1 s: pausa, salvar estado",
+    "MENU      Select: ajustes (brilho, LEDs, volume,",
+    "          modo de carga, enviar jogos por Wi-Fi)",
+    "JOGOS     cartao /roms (.nes .gb .gbc) ou embutidos",
+    "          estado salvo no cartao ou no console",
     "",
-    "MENU      Select: ajustes (bateria, Wi-Fi...)",
-    "CARTAO    pasta /roms com .nes .gb .gbc (FAT32)",
-    "          saves em /nes_saves e /gb_saves",
-    "",
-    "BATERIA   LEDs de baixo em vermelho = carregar",
-    "          (USB-C do console, chave de tras em I)",
+    "BATERIA   vermelho embaixo = carregar (chave em I)",
+    "          USB-C do console: vale o modo de carga",
+    "          base: sem modos, raio em 1 a 2 min",
 };
 constexpr char TXT_HELP_FOOTER[] = "Qualquer botao volta";
 
@@ -149,21 +149,21 @@ constexpr char TXT_MENU_FOOTER[] = "A/Start: play   Select: settings   B: help";
 
 constexpr char TXT_HELP[] = "HELP";
 constexpr const char *TXT_HELP_LINES[] = {
-    "POWER ON  short press on the side button (left)",
-    "POWER OFF hold the side button for ~4 s",
+    "POWER     side button: tap = on, hold ~4 s = off",
     "",
     "IN GAME   touch the icons below the screen:",
     "          < >  volume, or brightness after o",
     "          o    switch volume / brightness",
     "          finger on the screen for 1 s: mute",
-    "          Select + Start 1 s: pause (save state)",
+    "          Select+Start 1 s: pause, save/load state",
+    "MENU      Select: settings (brightness, LEDs,",
+    "          volume, charge mode, Wi-Fi transfer)",
+    "GAMES     card /roms (.nes .gb .gbc) or built in",
+    "          states go to the card or the console",
     "",
-    "MENU      Select: settings (battery, Wi-Fi...)",
-    "SD CARD   folder /roms with .nes .gb .gbc (FAT32)",
-    "          saves go to /nes_saves and /gb_saves",
-    "",
-    "BATTERY   red bottom LEDs = charge the console",
-    "          (console USB-C, rear switch on I)",
+    "BATTERY   red bottom LEDs = charge (rear switch I)",
+    "          console USB-C: charge modes apply",
+    "          base/dock: no modes, bolt after 1-2 min",
 };
 constexpr char TXT_HELP_FOOTER[] = "Any button goes back";
 

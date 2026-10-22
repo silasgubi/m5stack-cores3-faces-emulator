@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.1 - 2026-10-21
+
+### Changed
+
+- On-screen help rewritten for the newer features: pause menu and save states, what the settings hold, card or
+  built-in games, where states are saved, and charging through the console's USB-C versus the base.
+
 ## 1.3.0 - 2026-10-21
 
 ### Added
