@@ -96,7 +96,10 @@ bool gbDisplayInit() {
     if (!s_spi) s_spi = xSemaphoreCreateMutex();
     if (!s_queue || !s_spi) return false;
     M5.Display.fillScreen(TFT_BLACK);
-    if (!s_task && xTaskCreatePinnedToCore(displayTask, "gbDisplay", 4096, nullptr, 5, &s_task, 0) != pdPASS) {
+    // Priority 3, below the speaker task (4, gb_sound.cpp), as on the NES: a frame keeps
+    // core 0 busy for ~26 ms (the DMA wait spins), and above the speaker it starved the
+    // mixer, so playRaw on core 1 blocked for up to ~29 ms and the audio popped.
+    if (!s_task && xTaskCreatePinnedToCore(displayTask, "gbDisplay", 4096, nullptr, 3, &s_task, 0) != pdPASS) {
         log_printf("GB display: task creation failed\n");
         s_task = nullptr;
         return false;

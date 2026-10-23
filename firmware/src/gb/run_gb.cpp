@@ -136,16 +136,27 @@ void run_gb(const uint8_t *rom, size_t romLen, const char *romName) {
     int64_t emuSum = 0, emuMax = 0;
     uint32_t emuN = 0, logAt = millis() + 10000;
 
+    int64_t runMax = 0, padMax = 0, sndMax = 0, hookMax = 0;
+    uint32_t lateN = 0;
+    int sinceDraw = 2;  // frames since the last drawn one
     for (;;) {
         const int64_t t0 = esp_timer_get_time();
-        // Draw when the display is free and the previous frame was not late. Sending
-        // 266x240 takes ~26 ms, so two consecutive frames never go out (~30 Hz); without
-        // requiring an even frame, a busy display at frame N does not push the draw to N+4.
-        const bool draw = !late && !gbDisplayBusy();
+        // Draw every other frame (30 Hz, steady). Sending 266x240 takes ~26 ms and starts at
+        // vblank, near the end of gnuboy_run; two frames later the display has finished
+        // by that vblank, but at the start of the frame it is often still busy for 1-2 ms,
+        // so checking gbDisplayBusy() here skipped a frame now and then (20-27 draws/s,
+        // visible judder). The top lines rendered while the display sends the bottom bands
+        // are already out. A late frame skips the draw and the cadence restarts after it.
+        const bool draw = !late && sinceDraw >= 2;
+        sinceDraw = draw ? 1 : sinceDraw + 1;
         gnuboy_run(draw);
+        const int64_t t1 = esp_timer_get_time();
         gnuboy_set_pad(padBits());
+        const int64_t t2 = esp_timer_get_time();
         gbSoundFrame();
+        const int64_t t3 = esp_timer_get_time();
         osd_frame_hook();
+        const int64_t t4 = esp_timer_get_time();
         gbSaveTick();
         frame++;
 
@@ -153,17 +164,24 @@ void run_gb(const uint8_t *rom, size_t romLen, const char *romName) {
         emuSum += dt;
         emuN++;
         if (dt > emuMax) emuMax = dt;
+        if (t1 - t0 > runMax) runMax = t1 - t0;
+        if (t2 - t1 > padMax) padMax = t2 - t1;
+        if (t3 - t2 > sndMax) sndMax = t3 - t2;
+        if (t4 - t3 > hookMax) hookMax = t4 - t3;
         if ((int32_t)(millis() - logAt) >= 0) {
             logAt = millis() + 10000;
-            log_printf("emu_ms avg=%.2f max=%.2f\n", emuSum / 1000.0f / emuN, emuMax / 1000.0f);
-            emuSum = emuMax = 0;
-            emuN = 0;
+            log_printf("emu_ms avg=%.2f max=%.2f (run=%.1f pad=%.1f snd=%.1f hook=%.1f) late=%lu\n",
+                       emuSum / 1000.0f / emuN, emuMax / 1000.0f, runMax / 1000.0f, padMax / 1000.0f,
+                       sndMax / 1000.0f, hookMax / 1000.0f, (unsigned long)lateN);
+            emuSum = emuMax = runMax = padMax = sndMax = hookMax = 0;
+            emuN = lateN = 0;
         }
 
         next += FRAME_US + gbSoundPaceAdjustUs();
         const int64_t lateness = esp_timer_get_time() - next;
         if (lateness > 0) {
             late = true;
+            lateN++;
             if (lateness > FRAME_US) next = esp_timer_get_time();  // large delay: realign, do not accumulate
         } else {
             late = false;

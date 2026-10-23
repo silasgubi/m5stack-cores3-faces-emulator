@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.2 - 2026-10-22
+
+### Fixed
+
+- Game Boy: audio pops and an uneven picture, worst while scrolling. The Game Boy display task ran above the speaker
+  task on core 0, so during each ~26 ms screen transfer the mixer starved and the emulator blocked for up to ~29 ms
+  handing it samples (51 to 60 frames/s, the sound queue running dry up to 13 times a second). It now runs below the
+  speaker, as on the NES: a steady 60 frames/s and no gaps.
+- Game Boy: the picture is drawn on every other frame, a steady 30 Hz. It used to draw "when the display is free",
+  checked at the start of the frame while the previous transfer still had 1 to 2 ms to go, so frames were skipped
+  now and then (20 to 27 draws/s).
+
 ## 1.3.1 - 2026-10-21
 
 ### Changed
