@@ -7,6 +7,7 @@
 #include <M5Unified.h>
 #include <Preferences.h>
 #include "faces_pad.h"
+#include "leds.h"
 #include "menu.h"
 #include "pause_menu.h"
 #include "power_mode.h"
@@ -44,6 +45,8 @@ void setup() {
     // Boot screen: 3 s at power-on, 1 s when coming back from a game to pick another one.
     const uint32_t splashUntil = millis() + (fromGame ? 1000 : 3000);
     facesPadInit();
+    // The LEDs keep their last color through any restart (a crash too): the game list starts dark.
+    if (ledsInit()) ledsShow();
     sdMount();  // mounting runs while the boot screen is up
     while ((int32_t)(millis() - splashUntil) < 0) delay(10);
 

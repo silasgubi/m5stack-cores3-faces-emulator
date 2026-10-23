@@ -8,6 +8,7 @@
 #include "power_mode.h"
 #include "sd_roms.h"
 #include "faces_pad.h"
+#include "leds.h"
 #include "settings.h"
 #include "settings_menu.h"
 #include "ui_text.h"
@@ -309,6 +310,10 @@ void menuQuitToGameList() {
     p.putBool("go_menu", true);
     p.end();
     log_printf("menu: quit to the game list, restarting\n");
+    // The LEDs keep their last color through a restart: turn the ambilight off now.
+    ledsClear();
+    delay(6);  // ledsShow keeps 5 ms between transfers
+    ledsShow();
     delay(100);
     esp_restart();
 }

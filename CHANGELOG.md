@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.3 - 2026-10-23
+
+### Fixed
+
+- The ambilight stayed lit with the last game's colors after going back to the game list. The LEDs keep their last
+  color through a restart, so they are now turned off before the restart and again at boot.
+
 ## 1.3.2 - 2026-10-22
 
 ### Fixed
