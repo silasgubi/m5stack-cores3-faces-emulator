@@ -13,14 +13,15 @@ as a screen-edge "ambilight", and settings you can change without a computer.
 
 ## What it does
 
-- **NES** (Nofrendo): 60 Hz emulation, picture shown 1:1 at about 40 frames per second, sound at 22050 Hz.
+- **NES** (Nofrendo): 60 Hz emulation, every frame on the screen (interlaced: the even lines of one frame, the odd
+  lines of the next), picture widened to 272x240 (a TV showed NES pixels wider than tall), sound at 22050 Hz.
 - **Game Boy / Color** (gnuboy): 59.73 Hz, picture scaled 5:3 to 266x240 (full height), about 30 frames per second.
 - **Game menu** from `/roms` on a FAT32 microSD (up to 64 games) plus any games embedded in the firmware, remembers
   the last one, saves in `/nes_saves` and `/gb_saves`.
 - **Pause menu with save states** (Select + Start): save and resume any game at any point, even games with no battery
   save. States of card games go to the card; states of embedded games to the console's own flash.
-- **Faces Bottom3 LEDs:** the ten LEDs follow the colors at the left and right edges of the picture, with five
-  brightness levels; they also show the volume (right side), the brightness (left side) and pulse red when the
+- **Faces Bottom3 LEDs:** the ten LEDs follow the colors at the left and right edges of the picture (a 16 px strip
+  on each side cut into five rectangles, one per LED, each showing its dominant color), with five brightness levels; they also show the volume (right side), the brightness (left side) and pulse red when the
   battery is low.
 - **Battery:** the base's 600 mAh cell powers the console without a cable; percent and charge state on screen; four
   charge modes (Normal, Fast, Smart 40-80%, Off) when charging through the console's USB-C.

@@ -12,17 +12,16 @@
 // 2. RGB average of the pixels in the winning bucket (averaging everything gave a pale tone).
 // 3. Stretch the saturation (the classic NES sky (111,132,255) is lavender; on the LED it
 //    turns whitish purple) and apply gamma 2.2, because the LED at low current washes out colors.
-// 4. Background: the bucket seen most along the whole edge (the sky). Each LED covers 1/5 of
-//    the height (48 lines on the NES), sampled in 3 strips (16 lines); the LED shows the strip
-//    that departs most from the background (pipe and bush are 16 px tall and fill a strip;
-//    diluted over 48 lines they never went above 17%). If no strip has OBJECT_MIN_PCT of
-//    another color, the sum of the 3 is used.
+// 4. Geometry: a 16 px wide strip at each edge of the picture, cut into 5 rectangles, one per
+//    LED (48 lines each on the NES). The LED shows the dominant color of its rectangle,
+//    background included (an earlier version looked 64 px in, split each rectangle in 3 and
+//    favored what departed from the background; it lit colors that were not at the edge).
 //
 // Two frame sources, same logic (templates over the source, so the NES path does not change):
 // - Paletted (Nofrendo): lines of 8-bit indices + osd_pal_rgb palette.
-// - RGB565 (Game Boy, ledEffectsSetSource565): bands and strips proportional to the height
-//   (160x144: 5 bands of ~29 lines, strips of ~10), edges = 25% of the width on each side,
-//   bucket computed from the 565 value in integers (small cache: the Game Boy has few colors).
+// - RGB565 (Game Boy, ledEffectsSetSource565): proportional (160x144: 10 px strips, rectangles
+//   of ~29 lines), bucket computed from the 565 value in integers (small cache: the Game Boy
+//   has few colors).
 //
 // Priority on each side: level overlay (1.5 s after a change: volume on the right, brightness on
 // the left, mirroring the bars on the screen) > battery alert > edge effect. The other side keeps
@@ -46,11 +45,11 @@ static constexpr int LEVELS = 5;  // LEDs per side
 static constexpr uint32_t LED_BAR_MS = 1500;
 
 // Paletted NES (256x240): skips the 8 outermost columns (many games leave columns
-// 0-7 blank). Bands of 48 lines cover the whole screen, so the ground lands in the bottom one.
+// 0-7 blank). Rectangles of 48 lines cover the whole height, so the ground lands in the bottom one.
 static constexpr int NES_W = 256, NES_H = 240;
-static constexpr int EDGE_X0 = 8, EDGE_X1 = 72;     // left edge of the game
-static constexpr int EDGE_X2 = 184, EDGE_X3 = 248;  // right edge
-static constexpr int STRIPS = 3;                    // strips per band (NES: 3 x 16 lines)
+static constexpr int EDGE_W = 16;                   // strip width (Game Boy: proportional, w / 16)
+static constexpr int EDGE_X0 = 8, EDGE_X1 = EDGE_X0 + EDGE_W;        // left edge of the game
+static constexpr int EDGE_X2 = NES_W - 8 - EDGE_W, EDGE_X3 = NES_W - 8;  // right edge
 
 // Assumption about the Game Boy RGB565 framebuffer: it is in the panel byte order
 // (bytes swapped relative to the ESP32 native RGB565), same as the NES palette in
@@ -65,7 +64,6 @@ static constexpr int BUCKET_DARK = 0, BUCKET_GRAY = 1, BUCKETS = 14;
 static constexpr int DARK_MAX = 40;      // max(r,g,b) below this is "dark"
 static constexpr int GRAY_SPREAD = 30;   // max-min below this is "gray"
 static constexpr int COLORED_MIN_PCT = 25;  // less color than this in the sample: use dark/gray
-static constexpr int OBJECT_MIN_PCT = 25;   // a non-background color with this share of the strip beats the background
 
 static constexpr uint32_t BATTERY_PULSE_MS = 1000;  // red pulse period (~1 Hz)
 static constexpr uint8_t BATTERY_PULSE_FLOOR = 12;  // never fully off: reads as a pulse, not a blink
@@ -84,10 +82,10 @@ static uint16_t s_cur[LED_COUNT][3];  // smoothed color, 8.8 fixed point so smal
 // Sampling geometry, derived from the source. [0] = right side, [1] = left.
 struct Geometry {
     int w, h;
-    int stepX, stepY;  // 1 pixel every step (NES: 4 and 4; Game Boy 160x144: 2 and 3)
+    int stepX, stepY;  // 1 pixel every step (NES: 2 and 4; Game Boy 160x144: 1 and 3)
     int x0[2], x1[2];  // edge columns on each side
 };
-static Geometry s_geo = {NES_W, NES_H, 4, 4, {EDGE_X2, EDGE_X0}, {EDGE_X3, EDGE_X1}};
+static Geometry s_geo = {NES_W, NES_H, 2, 4, {EDGE_X2, EDGE_X0}, {EDGE_X3, EDGE_X1}};
 static const uint16_t *s_src565 = nullptr;
 static int s_srcPitch = 0;
 
@@ -98,22 +96,22 @@ static inline int bandY(int h) { return h * s_geo.h / LEVELS; }
 static void setGeometry(int w, int h, bool nes) {
     s_geo.w = w;
     s_geo.h = h;
-    // Same density as the NES (~2000 samples per frame): ~16 columns per side and ~60 lines.
-    s_geo.stepX = max(1, w / 64);
+    // ~8 columns per strip and ~60 lines: ~100 samples per rectangle, ~1000 per frame.
+    const int edge = nes ? EDGE_W : max(8, w / 16);
+    s_geo.stepX = max(1, edge / 8);
     s_geo.stepY = max(1, (h + 59) / 60);
     if (nes) {
         s_geo.x0[0] = EDGE_X2; s_geo.x1[0] = EDGE_X3;
         s_geo.x0[1] = EDGE_X0; s_geo.x1[1] = EDGE_X1;
     } else {
-        const int q = w / 4;
-        s_geo.x0[0] = w - q; s_geo.x1[0] = w;
-        s_geo.x0[1] = 0;     s_geo.x1[1] = q;
+        s_geo.x0[0] = w - edge; s_geo.x1[0] = w;
+        s_geo.x0[1] = 0;        s_geo.x1[1] = edge;
     }
 }
 
 void ledEffectsSetSource565(const uint16_t *fb, int width, int height, int pitchPixels) {
-    // Source too small for 5 bands x 3 strips and 1/4 of the width: back to the NES source.
-    if (!fb || width < 64 || height < LEVELS * STRIPS) {
+    // Source too small for 5 rectangles and an 8 px strip: back to the NES source.
+    if (!fb || width < 64 || height < LEVELS) {
         s_src565 = nullptr;
         setGeometry(NES_W, NES_H, true);
         return;
@@ -274,31 +272,25 @@ static void countRegion(const S &src, Region &r) {
         for (int x = r.x0; x < r.x1; x += s_geo.stepX) r.count[src.bucket(x, y)]++;
 }
 
-// Representative color of a set of strips (see the file header). count = sum of the
-// strips' buckets; background = background bucket of the whole edge, or -1 if none.
+// Dominant color of a rectangle (see the file header): the hue bucket with the most
+// pixels, averaged over its pixels; dark or gray when the rectangle has little color.
 template <typename S>
-static int pickColor(const S &src, const Region *strips, int nStrips, const uint16_t count[BUCKETS],
-                     int background, uint32_t out[3]) {
-    int total = 0, colored = 0, best = -1, bestOther = -1;
+static int pickColor(const S &src, const Region &r, uint32_t out[3]) {
+    const uint16_t *count = r.count;
+    int total = 0, colored = 0, best = -1;
     for (int b = 0; b < BUCKETS; ++b) total += count[b];
     for (int b = 2; b < BUCKETS; ++b) {
         colored += count[b];
         if (count[b] && (best < 0 || count[b] > count[best])) best = b;
-        if (b != background && count[b] && (bestOther < 0 || count[b] > count[bestOther])) bestOther = b;
     }
-    if (bestOther >= 0 && count[bestOther] * 100 >= total * OBJECT_MIN_PCT) best = bestOther;
     if (best < 0 || colored * 100 < total * COLORED_MIN_PCT) {
         best = count[BUCKET_GRAY] > count[BUCKET_DARK] ? BUCKET_GRAY : BUCKET_DARK;
     }
 
-    // Same lines as the count (strip by strip): on the Game Boy the strip is not a multiple of the step.
     uint32_t sum[3] = {0, 0, 0}, n = 0;
-    for (int t = 0; t < nStrips; ++t) {
-        const Region &r = strips[t];
-        for (int y = r.y0; y < r.y1; y += s_geo.stepY)
-            for (int x = r.x0; x < r.x1; x += s_geo.stepX)
-                if (src.addIfBucket(x, y, best, sum)) n++;
-    }
+    for (int y = r.y0; y < r.y1; y += s_geo.stepY)
+        for (int x = r.x0; x < r.x1; x += s_geo.stepX)
+            if (src.addIfBucket(x, y, best, sum)) n++;
     if (!n) { out[0] = out[1] = out[2] = 0; return best; }
     int rgb[3];
     for (int c = 0; c < 3; ++c) rgb[c] = sum[c] / n;
@@ -310,14 +302,6 @@ static int pickColor(const S &src, const Region *strips, int nStrips, const uint
     }
     for (int c = 0; c < 3; ++c) out[c] = GAMMA[rgb[c]];
     return best;
-}
-
-// Share (%) of the largest non-background color, to pick the most "interesting" strip.
-static int objectPct(const Region &r, int background) {
-    int total = 0, best = 0;
-    for (int b = 0; b < BUCKETS; ++b) total += r.count[b];
-    for (int b = 2; b < BUCKETS; ++b) if (b != background && r.count[b] > best) best = r.count[b];
-    return total ? best * 100 / total : 0;
 }
 
 static void smoothTo(int index, const uint32_t target[3]) {
@@ -334,60 +318,26 @@ static void smoothTo(int index, const uint32_t target[3]) {
 
 template <typename S>
 static void edgeEffect(const S &src) {
-    // regions[(2h + side) * STRIPS + strip]: side 0 = right, 1 = left
-    static Region regions[LEVELS * 2 * STRIPS];
-    uint32_t global[BUCKETS] = {0};
-    for (int h = 0; h < LEVELS; ++h) {
-        const int by0 = bandY(h), by1 = bandY(h + 1);
-        for (int side = 0; side < 2; ++side) {
-            for (int t = 0; t < STRIPS; ++t) {
-                Region &r = regions[(2 * h + side) * STRIPS + t];
-                r.x0 = s_geo.x0[side];
-                r.x1 = s_geo.x1[side];
-                r.y0 = by0 + t * (by1 - by0) / STRIPS;
-                r.y1 = by0 + (t + 1) * (by1 - by0) / STRIPS;
-                countRegion(src, r);
-                for (int b = 0; b < BUCKETS; ++b) global[b] += r.count[b];
-            }
-        }
-    }
-    int background = -1;
-    for (int b = 2; b < BUCKETS; ++b) {
-        if (global[b] && (background < 0 || global[b] > global[background])) background = b;
-    }
-
     static uint32_t s_logAt = 0;
     const bool doLog = (int32_t)(millis() - s_logAt) >= 0;
     if (doLog) s_logAt = millis() + 30000;
-    char line[160];
-    int pos = doLog ? snprintf(line, sizeof(line), "led bg=%d |", background) : 0;
+    char line[120];
+    int pos = doLog ? snprintf(line, sizeof(line), "led |") : 0;
 
+    // One rectangle per LED: side 0 = right, 1 = left; h = 0 near the screen.
     for (int h = 0; h < LEVELS; ++h) {
         for (int side = 0; side < 2; ++side) {
-            const Region *strips = &regions[(2 * h + side) * STRIPS];
-            // Strip with the most non-background color; if none reaches the minimum, sum all 3.
-            int bestT = 0, bestPct = 0;
-            for (int t = 0; t < STRIPS; ++t) {
-                const int p = objectPct(strips[t], background);
-                if (p > bestPct) { bestPct = p; bestT = t; }
-            }
-            uint16_t merged[BUCKETS];
-            const Region *pick = strips;
-            int nPick = STRIPS;
-            if (bestPct >= OBJECT_MIN_PCT) {
-                pick = &strips[bestT];
-                nPick = 1;
-                memcpy(merged, pick->count, sizeof(merged));
-            } else {
-                memcpy(merged, strips[0].count, sizeof(merged));
-                for (int t = 1; t < STRIPS; ++t)
-                    for (int b = 0; b < BUCKETS; ++b) merged[b] += strips[t].count[b];
-            }
+            Region r;
+            r.x0 = s_geo.x0[side];
+            r.x1 = s_geo.x1[side];
+            r.y0 = bandY(h);
+            r.y1 = bandY(h + 1);
+            countRegion(src, r);
             uint32_t rgb[3];
-            const int chosen = pickColor(src, pick, nPick, merged, background, rgb);
+            const int chosen = pickColor(src, r, rgb);
             smoothTo(side ? leftIndex(h) : rightIndex(h), rgb);
-            if (doLog && pos < (int)sizeof(line) - 20)
-                pos += snprintf(line + pos, sizeof(line) - pos, " %c%d:b%d/%d%%", side ? 'L' : 'R', h, chosen, bestPct);
+            if (doLog && pos < (int)sizeof(line) - 12)
+                pos += snprintf(line + pos, sizeof(line) - pos, " %c%d:b%d", side ? 'L' : 'R', h, chosen);
         }
     }
     if (doLog) log_printf("%s\n", line);

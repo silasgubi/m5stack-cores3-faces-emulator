@@ -153,3 +153,37 @@ Numbers are from one CoreS3 SE; the plain CoreS3 was not tested.
   120 s ago: +20 mV means charging, -10 mV means it stopped (`firmware/src/battery.cpp`). An exact reading would need
   a current sensor in the dock on that I2C bus.
 - **Online:** not found.
+
+### 18. M5.Speaker streaming: blocks must outlast a mixing pass, and playRaw can block
+
+- **Symptom:** pops in the NES sound even though the emulator ran at 60 frames per second and the queue counters
+  looked healthy; later, frames lost (44 per second) right after "fixing" the queue to always hold two blocks.
+- **Cause:** the M5Unified speaker task mixes one DMA buffer per pass (512 samples at the default length) and, when
+  no block is queued on the channel at that moment, it writes a buffer of silence to the DMA: a 23 ms gap inserted
+  into the stream, heard as a pop. With one-frame blocks (367 samples at 22050 Hz) and the two-slot queue, a pass
+  regularly needed a second block that had not been queued yet. Pushing more eagerly made it worse: with a fixed
+  channel, `playRaw()` waits until a slot is free, and a slot comes back only on the task's next pass, so the
+  call blocked for 13 to 22 ms and the emulator lost frames.
+- **Fix** (`firmware/src/nes_sound.cpp`): the APU renders one frame of samples every frame into a ring; the ring
+  feeds the speaker in blocks of at least two frames (up to three), only while `isPlaying(channel) < 2`; the ring
+  starts with ten frames of silence so the DMA (4 x 256 samples, kept small to limit the delay) is full and the
+  task is paced by it; the ring level trims the sample count by one per frame to follow the drift between
+  `esp_timer` and the I2S clock. Also: ask the APU every frame. Nofrendo applies register writes immediately and
+  renders them only when asked for samples, so skipping a frame merged two frames of writes and lost one-frame
+  notes (the drum hits of fast music sounded "groggy").
+- **Online:** the M5Unified header documents the two-slot queue and "wait for isPlaying(channel) to drop below 2
+  before refilling"; the silence insertion is visible in `Speaker_Class.inl` (the "no data" path).
+
+### 19. The panel's SPI bus caps whole frames at ~40 per second; interlace to show all 60
+
+- **Symptom:** NES animations that alternate frames (the SMB3 tail spin, sprite flicker) stuttered; the display
+  task logged 20 to 39 frames per second, unevenly.
+- **Cause:** a 256x240 RGB565 frame is 983 kbit; at the 40 MHz the ILI9342C accepts (80 MHz corrupts the picture)
+  that is ~25 ms, more than the 16.7 ms frame. Drawing "when the display is free" skipped frames at random.
+- **Fix** (`firmware/src/nes_display.cpp`): send the even lines of one frame and the odd lines of the next, one
+  `setWindow` per line, ~14 ms per half frame, so every frame contributes. Half the lines are 1/60 s older, which
+  shows as a fine comb on fast horizontal motion. A steady 30 Hz (every other frame) and a 30 Hz average of frame
+  pairs were tried and judged worse on the device. The Game Boy keeps whole frames at a steady 30 Hz (one draw
+  every two frames) because its smaller picture made the judder less visible.
+- **Online:** not found for this panel.
+

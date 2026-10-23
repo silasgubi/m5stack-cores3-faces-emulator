@@ -66,8 +66,14 @@ extern void osd_getsoundinfo(sndinfo_t *info);
 
 /* display */
 extern void display_init(void);
-extern void display_write_frame(const uint8_t *data[]);
+extern void display_write_frame(const uint8_t *frame, int pitch);
 extern void display_clear(void);
+
+/* Added: two pixel arrays. The PPU draws each frame into the other one (the line pointers
+   of the one bitmap are swapped after each frame), so the display task reads a finished
+   frame while the next one is being drawn (nes_display.cpp sends every frame, interlaced). */
+static uint8_t *s_fbase[2] = { NULL, NULL };  /* line 0 of each array (after the overdraw slack) */
+static int s_fwhich = 0;                      /* the array the PPU is drawing into */
 
 /* save */
 extern void sram_autosave_tick(void);
@@ -78,16 +84,15 @@ QueueHandle_t vidQueue;
 static volatile bool s_drawing = false;  /* Added: a frame is between the queue and the screen */
 static void displayTask(void *arg)
 {
-    bitmap_t *bmp = NULL;
+    const uint8_t *frame;
     nofrendo_log_printf("OSD: displayTask started\n");
     while (1) {
         /* Changed: peek, flag, then receive, so "queue empty and not drawing" really means
            idle (osd_pause_begin). */
-        if (xQueuePeek(vidQueue, &bmp, portMAX_DELAY) == pdTRUE) {
+        if (xQueuePeek(vidQueue, &frame, portMAX_DELAY) == pdTRUE) {
             s_drawing = true;
-            xQueueReceive(vidQueue, &bmp, 0);
-            if (!bmp || !bmp->line[0]) { nofrendo_log_printf("OSD: bad bmp\n"); s_drawing = false; continue; }
-            display_write_frame((const uint8_t **)bmp->line);
+            xQueueReceive(vidQueue, &frame, 0);
+            display_write_frame(frame, FB_PITCH);
             s_drawing = false;
             static uint32_t frames=0;
             if ((++frames & 0x3F) == 0) nofrendo_log_printf("OSD: frames=%lu\n", (unsigned long)frames);
@@ -148,8 +153,12 @@ static bitmap_t *lock_write(void)
         nofrendo_log_printf("OSD: alloc fb %u bytes (%dx%d)\n",
                             (unsigned)fb_size, FB_WIDTH, FB_HEIGHT);
         fb = (uint8_t*) malloc(fb_size);
-        if (!fb) { nofrendo_log_printf("OSD: alloc fb FAILED\n"); return NULL; }
+        uint8_t *fb2 = (uint8_t*) malloc(fb_size);  /* Added: second array for the blend */
+        if (!fb || !fb2) { nofrendo_log_printf("OSD: alloc fb FAILED\n"); return NULL; }
         memset(fb, 0, fb_size);
+        memset(fb2, 0, fb_size);
+        s_fbase[0] = fb + FB_OVERDRAW;
+        s_fbase[1] = fb2 + FB_OVERDRAW;
 
         myBitmap = bmp_createhw((uint8 *)fb + FB_OVERDRAW, FB_WIDTH, FB_HEIGHT, FB_PITCH);
         if (!myBitmap) { nofrendo_log_printf("OSD: bmp_createhw FAILED\n"); return NULL; }
@@ -185,13 +194,18 @@ static void custom_blit(bitmap_t *bmp, int num_dirties, rect_t *dirty_rects)
             s_t0 = now; s_sum = 0; s_max = 0; s_n = 0;
         }
     }
-    if (xQueueSend(vidQueue, &bmp, 0) != pdPASS) {
-        bitmap_t *tmp; xQueueReceive(vidQueue, &tmp, 0);
-        (void)xQueueSend(vidQueue, &bmp, 0);
+    /* Changed: the queue carries the finished frame's array; a frame still waiting is replaced. */
+    const uint8_t *frame = s_fbase[s_fwhich];
+    if (xQueueSend(vidQueue, &frame, 0) != pdPASS) {
+        const uint8_t *tmp; xQueueReceive(vidQueue, &tmp, 0);
+        (void)xQueueSend(vidQueue, &frame, 0);
     }
     do_audio_frame();
     sram_autosave_tick();
     osd_frame_hook();  /* Added: volume, battery and LEDs (frame_hook.cpp) */
+    /* Added: the next frame goes into the other array (after the hook: the LEDs read this one). */
+    s_fwhich ^= 1;
+    for (int y = 0; y < FB_HEIGHT; y++) bmp->line[y] = s_fbase[s_fwhich] + y * FB_PITCH;
 }
 
 viddriver_t sdlDriver = {
@@ -253,7 +267,7 @@ int osd_init(void)
     if (osd_init_sound()) return -1;
 
     display_init();
-    vidQueue = xQueueCreate(2, sizeof(bitmap_t *));
+    vidQueue = xQueueCreate(2, sizeof(const uint8_t *));
     xTaskCreatePinnedToCore(&displayTask, "displayTask", 4096, NULL, 3, NULL, 0);
     osd_initinput();
     return 0;

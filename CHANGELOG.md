@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.4.0 - 2026-10-23
+
+### Changed
+
+- NES picture: every frame reaches the screen. A whole 256x240 frame takes ~25 ms on the panel's SPI bus, so only
+  ~39 of the 60 frames were drawn, unevenly, and animations that alternate frames (the SMB3 tail spin, sprite
+  flicker) stuttered. The picture is now interlaced: the even lines of one frame and the odd lines of the next,
+  ~14 ms each. Fast motion shows a slight comb effect; a steady 30 Hz and a 30 Hz blend of frame pairs were
+  tried and looked worse.
+- NES picture widened from 256 to 272 pixels (17:16). On a TV the NES pixel was wider than tall (8:7); 272 goes
+  halfway there and keeps 24 px strips at the sides for the volume and brightness bars and the battery icon.
+- Ambilight: each LED now shows the dominant color of its own rectangle, a 16 px strip at the edge of the picture
+  (10 px on the Game Boy) cut into five. The old version looked 64 px in and favored colors that departed from
+  the background, so it lit colors that were not at the edge.
+
+### Fixed
+
+- NES sound: pops and "groggy" music, worst in games with fast music such as SMB3. Two causes. The APU was asked
+  for samples only when the speaker queue had room, and a skipped frame merged two frames of register writes, so
+  one-frame notes (drum hits) were lost; it is now asked every frame, into a ring buffer. And the M5.Speaker task
+  inserts a buffer of silence whenever it finds no queued block, which happened regularly with one-frame blocks;
+  blocks are now at least two frames long, the ring starts with a stock of silence so the DMA stays full, and
+  `playRaw` is only called when `isPlaying(channel) < 2` (with a fixed channel it blocks for up to ~20 ms
+  otherwise, long enough to lose a frame). See lessons 18 and 19.
+
 ## 1.3.3 - 2026-10-23
 
 ### Fixed

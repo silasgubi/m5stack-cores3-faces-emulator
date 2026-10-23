@@ -1,5 +1,5 @@
 // Bars and battery icon in the black strips beside the game. Both games leave the strips
-// free: the NES image covers x 32..287, the Game Boy one x 40..279.
+// free: the NES image covers x 24..295, the Game Boy one x 27..292.
 // - Volume bar on the right strip (x 296..311), brightness bar mirrored on the left
 //   (x 8..23). Each shows for HUD_BAR_MS after a change; showing one hides the other at
 //   once, so the bar on screen is always the control that "<" and ">" change.
