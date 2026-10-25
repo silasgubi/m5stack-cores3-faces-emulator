@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.5.0 - 2026-10-25
+
+### Added
+
+- Ambilight level from the touch strip in a game: the `o` icon now cycles volume > brightness > ambilight. The
+  ambilight uses the left bar in cyan (level 0 = empty bar, LEDs off); `<` and `>` change the level, which applies
+  at once and is saved 3 s after the last touch together with the brightness (no flash write inside a frame).
+  Help screen updated.
+
 ## 1.4.0 - 2026-10-23
 
 ### Changed

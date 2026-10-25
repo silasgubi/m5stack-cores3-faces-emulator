@@ -7,6 +7,7 @@
 // (hud.cpp): volume on the right LEDs, brightness on the left. Showing one ends the other.
 void ledEffectsShowVolume(uint8_t volume, bool muted);
 void ledEffectsShowBrightness(int level, int levels);  // level 0..levels-1
+void ledEffectsShowAmbilight();  // ends both overlays: the edge effect itself shows the new level
 void ledEffectsFrame();
 
 // Frame source for the edge effect. Without a call, it uses the Nofrendo paletted

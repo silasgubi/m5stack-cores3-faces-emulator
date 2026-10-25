@@ -26,7 +26,7 @@ as a screen-edge "ambilight", and settings you can change without a computer.
 - **Battery:** the base's 600 mAh cell powers the console without a cable; percent and charge state on screen; four
   charge modes (Normal, Fast, Smart 40-80%, Off) when charging through the console's USB-C.
 - **Touch controls** on the icons printed below the screen; in game, the battery icon sits at the top of the right
-  strip and the brightness bar on the left (like the original Game Boy: contrast left, volume right).
+  strip and the brightness and ambilight bars on the left (like the original Game Boy: contrast left, volume right).
 - **Wi-Fi file transfer:** the console creates its own network, shows a QR code, and you manage games and saves from
   a web page.
 - English or Brazilian Portuguese on-screen text (build option).
@@ -92,7 +92,7 @@ save too).
 | Menu | **Select** | Settings. |
 | Menu | **B** | Help screen. |
 | Game, icons below the screen | `<` / `>` | Lower / raise the active control (volume by default). |
-| Game | `o` (middle circle) | Switch between volume and brightness (back to volume after 3 s). |
+| Game | `o` (middle circle) | Next control: volume > brightness (green bar, left) > ambilight (cyan bar, left; level 0 = off). Back to volume after 3 s. |
 | Game | Finger held on the screen about 1 s | Mute on / off. |
 | Console | Side button: tap | Power on. |
 | Console | Side button: hold about 4 s | Power off. |

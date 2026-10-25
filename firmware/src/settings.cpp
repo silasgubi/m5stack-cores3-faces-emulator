@@ -48,11 +48,13 @@ static uint32_t s_saveAtMs = 0;
 
 static int clampInt(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+// Brightness and ambilight share the delayed save (both change from the touch strip in a game).
 static void saveBrightness() {
     s_savePending = false;
     Preferences p;
     p.begin(NVS_NAMESPACE, false);
     p.putUChar(KEY_BRIGHTNESS, (uint8_t)s_brightness);
+    p.putUChar(KEY_AMBILIGHT, (uint8_t)s_ambilight);
     p.end();
 }
 
@@ -122,10 +124,9 @@ void settingsSetAmbilightLevel(int level) {
     level = clampInt(level, 0, AMBILIGHT_LEVELS - 1);
     if (level == s_ambilight) return;
     s_ambilight = level;  // read by led_effects on core 1 every frame
-    Preferences p;
-    p.begin(NVS_NAMESPACE, false);
-    p.putUChar(KEY_AMBILIGHT, (uint8_t)level);
-    p.end();
+    // Saved with the brightness, after the delay: a flash write inside a game frame costs a frame.
+    s_savePending = true;
+    s_saveAtMs = millis() + SAVE_DELAY_MS;
 }
 
 int settingsChargeMode() { return s_chargeMode; }

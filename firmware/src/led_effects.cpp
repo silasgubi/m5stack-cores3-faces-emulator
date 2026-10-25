@@ -227,6 +227,11 @@ void ledEffectsShowBrightness(int level, int levels) {
     s_volumeUntilMs = 0;
 }
 
+void ledEffectsShowAmbilight() {
+    s_volumeUntilMs = 0;
+    s_brightUntilMs = 0;
+}
+
 void ledEffectsSetBatteryAlert(int level) { s_batteryLevel = constrain(level, 0, 2); }
 
 // A level on one side, lit from the bottom (near the buttons) up. The smoothed color of

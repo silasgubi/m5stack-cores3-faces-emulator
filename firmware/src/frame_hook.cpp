@@ -6,9 +6,10 @@
 //
 // Touch controls:
 // - Strip below the screen, with the icons printed on the CoreS3: "<" and ">" step the
-//   active control down and up; "o" switches it between volume (default, bar on the
-//   right) and brightness (bar on the left). After ACTIVE_TIMEOUT_MS without strip
-//   touches it falls back to volume, so a later "<" never dims the screen by surprise.
+//   active control down and up; "o" cycles it: volume (default, bar on the right) ->
+//   brightness (green bar on the left) -> ambilight (cyan bar on the left, level 0 = off)
+//   -> volume. After ACTIVE_TIMEOUT_MS without strip touches it falls back to volume, so
+//   a later "<" never dims the screen by surprise.
 // - A finger held on the screen itself for LONG_TOUCH_MS toggles mute, once per touch.
 //   Short taps do nothing, so brief accidental contacts are ignored; a thumb resting
 //   on the screen for longer does toggle it.
@@ -35,7 +36,7 @@ static constexpr uint32_t LONG_TOUCH_MS = 1000;
 // Volume table and default step: settings.h (shared with the settings menu).
 static constexpr uint32_t VOLUME_SAVE_DELAY_MS = 3000;  // write to NVS only after the user stops changing it
 
-enum class Control : uint8_t { Volume, Brightness };
+enum class Control : uint8_t { Volume, Brightness, Ambilight };
 
 static int s_step = VOLUME_DEFAULT_STEP;
 static bool s_muted = false;
@@ -58,6 +59,11 @@ static void showBrightness() {
     const int level = settingsBrightnessLevel();
     hudShowBrightness(level, SETTINGS_BRIGHTNESS_LEVELS);
     ledEffectsShowBrightness(level, SETTINGS_BRIGHTNESS_LEVELS);
+}
+
+static void showAmbilight() {
+    hudShowAmbilight(settingsAmbilightLevel(), AMBILIGHT_LEVELS);
+    ledEffectsShowAmbilight();
 }
 
 static void applyVolume() {
@@ -90,10 +96,14 @@ static void saveVolumeIfDue() {
 }
 
 static void stripTouch(int x) {
-    if (x >= ZONE_LEFT_MAX_X && x < ZONE_RIGHT_MIN_X) {  // "o"
-        s_control = s_control == Control::Volume ? Control::Brightness : Control::Volume;
+    if (x >= ZONE_LEFT_MAX_X && x < ZONE_RIGHT_MIN_X) {  // "o": next control
+        s_control = s_control == Control::Volume       ? Control::Brightness
+                    : s_control == Control::Brightness ? Control::Ambilight
+                                                       : Control::Volume;
         if (s_control == Control::Brightness)
             showBrightness();
+        else if (s_control == Control::Ambilight)
+            showAmbilight();
         else
             showVolume();
         return;
@@ -102,6 +112,9 @@ static void stripTouch(int x) {
     if (s_control == Control::Brightness) {
         settingsSetBrightnessLevel(settingsBrightnessLevel() + dir);  // applied now, saved by settingsTick
         showBrightness();
+    } else if (s_control == Control::Ambilight) {
+        settingsSetAmbilightLevel(settingsAmbilightLevel() + dir);  // applied by led_effects on the next frame
+        showAmbilight();
     } else {
         s_step = constrain(s_step + dir, 0, VOLUME_STEP_COUNT - 1);
         s_muted = false;
@@ -112,7 +125,7 @@ static void stripTouch(int x) {
 static void handleTouch() {
     M5.update();
     const uint32_t now = millis();
-    if (s_control == Control::Brightness && now - s_lastStripMs >= ACTIVE_TIMEOUT_MS) s_control = Control::Volume;
+    if (s_control != Control::Volume && now - s_lastStripMs >= ACTIVE_TIMEOUT_MS) s_control = Control::Volume;
     if (M5.Touch.getCount() == 0) return;
     const auto &t = M5.Touch.getDetail(0);
     if (t.wasPressed() && t.y >= TOUCH_STRIP_Y) {

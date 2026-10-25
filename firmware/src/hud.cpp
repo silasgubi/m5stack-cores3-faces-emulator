@@ -21,9 +21,11 @@ static constexpr int BAT_X = 288 + (32 - BATTERY_ICON_V_W) / 2, BAT_Y = 6;  // c
 
 static constexpr uint32_t REQ_NEW = 1u << 31;  // a request is never 0
 
-// One slot for both bars: only one shows at a time, so the latest request wins.
+// One slot for all bars: only one shows at a time, so the latest request wins.
 static constexpr uint32_t BAR_BRIGHTNESS = 1u << 30;
-static std::atomic<uint32_t> s_barReq{0};  // volume | muted << 8, or filled px | BAR_BRIGHTNESS
+static constexpr uint32_t BAR_AMBILIGHT = 1u << 29;  // left bar too, drawn in cyan
+static constexpr uint16_t AMBILIGHT_COLOR = TFT_CYAN;
+static std::atomic<uint32_t> s_barReq{0};  // volume | muted << 8, or filled px | BAR_BRIGHTNESS / BAR_AMBILIGHT
 static std::atomic<uint32_t> s_batReq{0};  // percent | charging << 8 | present << 9
 
 // Display task state.
@@ -38,6 +40,12 @@ void hudShowBrightness(int level, int levels) {
     if (levels < 1) return;
     level = constrain(level, 0, levels - 1);
     s_barReq.store((uint32_t)((level + 1) * BAR_H / levels) | BAR_BRIGHTNESS | REQ_NEW, std::memory_order_relaxed);
+}
+
+void hudShowAmbilight(int level, int levels) {
+    if (levels < 2) return;
+    level = constrain(level, 0, levels - 1);  // 0 = off: empty bar
+    s_barReq.store((uint32_t)(level * BAR_H / (levels - 1)) | BAR_AMBILIGHT | REQ_NEW, std::memory_order_relaxed);
 }
 
 void hudSetBattery(int percent, bool charging, bool present) {
@@ -79,9 +87,9 @@ void hudDraw() {
         s_battery = bat & ~REQ_NEW;
         if (!s_volHideMs) drawBattery();
     }
-    if (bar & BAR_BRIGHTNESS) {
+    if (bar & (BAR_BRIGHTNESS | BAR_AMBILIGHT)) {
         if (s_volHideMs) hideVolume();
-        drawBar(BRI_X, bar & 0xFFFF, TFT_GREEN);
+        drawBar(BRI_X, bar & 0xFFFF, (bar & BAR_AMBILIGHT) ? AMBILIGHT_COLOR : TFT_GREEN);
         s_briHideMs = (millis() + BRIGHTNESS_ACTIVE_MS) | 1;
     } else if (bar) {
         if (s_briHideMs) hideBrightness();

@@ -8,6 +8,7 @@
 // Game Boy gbDisplay), the only owner of the display SPI.
 void hudShowVolume(uint8_t volume, bool muted);
 void hudShowBrightness(int level, int levels);  // level 0..levels-1
+void hudShowAmbilight(int level, int levels);   // level 0 (off)..levels-1, same bar as brightness, other color
 void hudSetBattery(int percent, bool charging, bool present);
 void hudDraw();
 
